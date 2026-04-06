@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Shift Roster</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 5px;
+            text-align: center;
+        }
+
+        th {
+            cursor: default;
+        }
+
+        td:hover {
+            background-color: #f0f0f0 !important;
+        }
+
+        h3 {
+            margin-top: 20px;
+            color: #333;
+        }
+
+        th {
+            position: sticky;
+            top: 0;
+            background: #f2f2f2;
+            z-index: 2;
+        }
+
+        td:first-child {
+            text-align: left;
+            white-space: nowrap;
+        }
+
+        tr:hover td {
+            background-color: #f9f9f9;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: #f5f7fb;
+            margin: 20px;
+        }
+
+        h2 {
+            color: #333;
+        }
+
+        table {
+            border-collapse: collapse;
+            margin-bottom: 25px;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        th {
+            background: #eef2ff;
+            color: #333;
+            font-size: 12px;
+            padding: 8px;
+            text-align: center;
+        }
+
+        td {
+            text-align: center;
+            padding: 6px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        tr:hover td {
+            background-color: #f9f9f9;
+        }
+
+        button {
+            background: #4f46e5;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+
+        button:hover {
+            background: #4338ca;
+        }
+
+    </style>
+</head>
+<body>
+<div style="margin-bottom:15px;">
+    <select id="monthSelect">
+        <option value="1">Jan</option>
+        <option value="2">Feb</option>
+        <option value="3">Mar</option>
+        <option value="4">Apr</option>
+        <option value="5">May</option>
+        <option value="6">Jun</option>
+        <option value="7">Jul</option>
+        <option value="8">Aug</option>
+        <option value="9">Sep</option>
+        <option value="10">Oct</option>
+        <option value="11">Nov</option>
+        <option value="12">Dec</option>
+    </select>
+
+    <input type="number" id="yearSelect" value="2026" style="width:80px;">
+
+    <button onclick="reloadRoster()">Load</button>
+</div>
+<div id="loginBox" style="margin-bottom:15px;">
+    <input id="username" placeholder="Username">
+    <input id="password" type="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+</div>
+<h2>Shift Roster</h2>
+<button id="undoBtn" onclick="undoLastChange()">Undo</button>
+<button id="redoBtn" onclick="redoLastChange()">Redo</button>
+<button id="logoutBtn" onclick="logout()">Logout</button>
+<button id="finalizeBtn" onclick="finalizeRoster()">Finalize</button>
+<span id="statusLabel" style="margin-left:10px; font-weight:bold;"></span>
+<div id="rosterTable"></div>
+
+<script>
+
+let isDragging = false;
+let selectedCells = [];
+let startCell = null;
+let rosterData = [];
+let datesGlobal = [];
+let dragCompleted = false;
+let historyStack = [];
+let redoStack = [];
+let isAdmin = !!localStorage.getItem("token");
+
+async function login() {
+
+    const username = document.getElementById("username").value;
+    const password = document.getElementById("password").value;
+
+    const res = await fetch("/login", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            username: username,
+            password: password
+        })
+    });
+
+    if (res.status !== 200) {
+        alert("Login failed");
+        return;
+    }
+
+    const data = await res.json();
+
+    localStorage.setItem("token", data.access_token);
+
+    alert("Login successful");
+
+    document.getElementById("loginBox").style.display = "none";
+
+    loadRoster();
+}
+
+async function loadRoster() {
+    if (localStorage.getItem("token")) {
+        document.getElementById("loginBox").style.display = "none";
+    }
+    const month = document.getElementById("monthSelect").value;
+    const year = document.getElementById("yearSelect").value;
+
+    const res = await fetch(`/roster?month=${month}&year=${year}`);
+    const data = await res.json();
+    if (!data.length) return;
+    // ✅ ADD THIS BLOCK
+    const rosterStatus = data[0].status || "DRAFT";
+
+    document.getElementById("statusLabel").innerText =
+        rosterStatus === "FINAL" ? "🔒 FINAL" : "✏️ DRAFT";
+
+    rosterData = data;
+    datesGlobal = Object.keys(data[0].shifts).sort();
+
+    const dates = Object.keys(data[0].shifts).sort();
+
+    const groups = {};
+
+    data.forEach(emp => {
+        const team = emp.team || "Others";
+        if (!groups[team]) groups[team] = [];
+
+        if (!groups[team].some(e => e.employee_id === emp.employee_id)) {
+            groups[team].push(emp);
+        }
+    });
+
+    let html = "";
+
+    for (const team in groups) {
+        html += `<h3>${team}</h3>`;
+        html += `<table border="1">`;
+
+        html += "<tr><th>Employee</th>";
+        dates.forEach(d => {
+            const dateObj = new Date(d);
+
+            const day = dateObj.toLocaleDateString("en-US", { weekday: "short" });
+            const dateNum = dateObj.getDate();
+
+            const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+
+            html += `<th style="${isWeekend ? 'background:#ffecec;' : ''}">
+                <div>${day}</div>
+                <div>${dateNum}</div>
+            </th>`;
+        });
+        // 👉 spacer column
+        html += `<th style="width:6px; background:#e5e7eb;"></th>`;
+
+        // 👉 summary headers
+        html += `<th>S1</th><th>S2</th><th>S3</th><th>G</th><th>WO</th><th>CO</th><th>GH</th><th>LV</th>`;
+        html += "</tr>";
+
+        groups[team].forEach(emp => {
+
+            // 👉 initialize counters
+            let counts = {
+                S1:0, S2:0, S3:0, G:0, WO:0, CO:0, GH:0, LV:0
+            };
+
+            html += `<tr><td>${emp.employee_name}</td>`;
+
+            dates.forEach(d => {
+                const shift = emp.shifts[d] || '-';
+
+                if (counts[shift] !== undefined) {
+                    counts[shift]++;
+                }
+
+                let color = "#fff";
+
+                if (shift === "S1") color = "#cce5ff";
+                else if (shift === "S2") color = "#ffe5cc";
+                else if (shift === "S3") color = "#e6ccff";
+                else if (shift === "WO") color = "#d6d6d6";
+                else if (shift === "G") color = "#ccffd9";
+                else if (shift === "LV") color = "#ffcccc";
+                else if (shift === "GH") color = "#ffffcc";
+                else if (shift === "CO") color = "#ccf2ff";
+
+                const dateObj = new Date(d);
+                const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+
+                let bgColor = color;
+
+                if (isWeekend && shift === '-') {
+                    bgColor = "#fff5f5";
+                }
+
+                html += `<td style="background:${bgColor}"
+                            data-emp="${emp.employee_id}"
+                            data-date="${d}">
+                            ${shift}
+                        </td>`;
+            });
+
+            // 👉 spacer cell
+            html += `<td style="background:#e5e7eb;"></td>`;
+            // 👉 ADD RIGHT SIDE SUMMARY
+            html += `
+                <td>${counts.S1}</td>
+                <td>${counts.S2}</td>
+                <td>${counts.S3}</td>
+                <td>${counts.G}</td>
+                <td>${counts.WO}</td>
+                <td>${counts.CO}</td>
+                <td>${counts.GH}</td>
+                <td>${counts.LV}</td>
+            `;
+
+            html += "</tr>";
+        });
+
+        html += `<tr><td colspan="${dates.length + 10}" style="height:2px; background:transparent;"></td></tr>`;
+
+        html += `<tr style="background:#eef2ff; font-weight:bold;">
+            <td colspan="${dates.length + 10}" style="text-align:center;">
+                Shift Summary
+            </td>
+        </tr>`;
+
+        // 👉 Pivot summary (Shift vs Date)
+        let pivot = {
+            S1:{}, S2:{}, S3:{}, G:{}, WO:{}, CO:{}, GH:{}, LV:{}
+        };
+
+        // initialize
+        dates.forEach(d => {
+            Object.keys(pivot).forEach(shift => {
+                pivot[shift][d] = 0;
+            });
+        });
+
+        // fill data
+        groups[team].forEach(emp => {
+            dates.forEach(d => {
+                const shift = emp.shifts[d] || '-';
+
+                if (pivot[shift]) {
+                    pivot[shift][d]++;
+                }
+            });
+        });
+
+        // 👉 render pivot rows
+        Object.keys(pivot).forEach(shift => {
+
+            html += `<tr style="background:#e8f0fe; font-weight:bold;">
+                <td style="position:sticky; left:0; background:#e8f0fe;">
+                    <b>${shift}</b>
+                </td>`;
+
+            dates.forEach(d => {
+                const count = pivot[shift][d];
+
+                let style = "font-weight:normal;";
+
+                if (count > 2) {
+                    style += "background:#28a745; color:white; font-weight:bold;";
+                } else if (count < 2) {
+                    style += "background:#dc3545; color:white; font-weight:bold;";
+                }
+
+                html += `<td style="${style}">${count}</td>`;
+            });
+
+            // empty for right-side summary columns
+            // divider column
+            html += `<td style="background:#e5e7eb;"></td>`;
+
+            // remaining empty summary columns
+            html += `<td colspan="8"></td>`;
+
+            html += `</tr>`;
+        });
+
+        html += "</table><br>";
+    }
+
+    document.getElementById("rosterTable").innerHTML = html;
+
+    const bulkSelect = document.getElementById("bulkSelect");
+
+    if (bulkSelect) {
+        bulkSelect.onchange = async function() {
+            if (!localStorage.getItem("token")) {
+                alert("Login required");
+                return;
+            }
+            const shift = this.value;
+            if (!shift) return;
+
+            redoStack = [];
+
+            for (let item of selectedCells) {
+                await fetch(`/roster-entry?employee_id=${item.empId}&date=${item.date}&shift_code=${shift}`, {
+                    method: "PUT",
+                    headers: {
+                        "Authorization": "Bearer " + localStorage.getItem("token")
+                    }
+                });
+                
+                if (res.status === 401) {
+                    alert("Session expired. Please login again.");
+                    localStorage.removeItem("token");
+                    loadRoster();
+                    return;
+                }
+
+                const oldValue = item.cell.innerText.trim();
+
+                historyStack.push({
+                    empId: item.empId,
+                    date: item.date,
+                    oldValue,
+                    newValue: shift
+                });
+
+                // redoStack = []; // ✅ CLEAR REDO STACK
+
+                item.cell.innerHTML = shift;
+                applyColor(item.cell, shift);
+
+                // 🔥 ADD THIS
+                updateRowSummary(item.empId, oldValue, shift);
+                updatePivot(item.date, oldValue, shift);
+            }
+
+            clearSelection();
+            document.getElementById("bulkDropdown").style.display = "none";
+            // ✅ ADD THIS LINE HERE
+            document.getElementById("bulkSelect").value = "";
+        };
+    }
+
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+        document.getElementById("undoBtn").style.display = "none";
+        document.getElementById("redoBtn").style.display = "none";
+        document.getElementById("logoutBtn").style.display = "none";
+        document.getElementById("loginBox").style.display = "block";
+        document.getElementById("finalizeBtn").style.display = "none";
+    } else {
+        document.getElementById("undoBtn").style.display = "inline-block";
+        document.getElementById("redoBtn").style.display = "inline-block";
+        document.getElementById("logoutBtn").style.display = "inline-block";
+        document.getElementById("loginBox").style.display = "none";
+        document.getElementById("finalizeBtn").style.display = "inline-block";
+    }
+
+    attachEvents(); // ✅ IMPORTANT
+}
+
+function attachEvents() {
+    const cells = document.querySelectorAll("#rosterTable td");
+
+    cells.forEach(cell => {
+
+        cell.addEventListener("mousedown", (e) => {
+            if (!localStorage.getItem("token")) return;
+            if (e.button !== 0) return;
+
+            isDragging = true;
+            startCell = cell;
+            updateSelection(cell);
+        });
+
+        cell.addEventListener("mouseenter", () => {
+            if (!isDragging) return;
+            updateSelection(cell);
+        });
+
+        cell.addEventListener("click", () => {
+
+            // ✅ MAIN FIX: block click right after drag
+            if (dragCompleted) {
+                dragCompleted = false;
+                return;
+            }
+
+            // existing condition
+            if (selectedCells.length > 1) return;
+
+            editCell(cell, cell.dataset.emp, cell.dataset.date);
+        });
+    });
+
+    document.addEventListener("mouseup", (e) => {
+        if (!isDragging) return;
+
+        isDragging = false;
+        dragCompleted = true; // ✅ IMPORTANT
+        // 🔥 BONUS: safety reset (prevents stuck state)
+        setTimeout(() => {
+            dragCompleted = false;
+        }, 100);
+
+        if (selectedCells.length === 0) return;
+
+        const dropdown = document.getElementById("bulkDropdown");
+
+        dropdown.style.display = "block";
+        dropdown.style.left = e.pageX + "px";
+        dropdown.style.top = e.pageY + "px";
+    });
+}
+
+function updateSelection(endCell) {
+    clearSelection();
+
+    const table = endCell.closest("table");
+    const rows = Array.from(table.querySelectorAll("tr")).slice(1);
+
+    const startRow = startCell.parentElement.rowIndex - 1;
+    const startCol = startCell.cellIndex;
+
+    const endRow = endCell.parentElement.rowIndex - 1;
+    const endCol = endCell.cellIndex;
+
+    const minRow = Math.min(startRow, endRow);
+    const maxRow = Math.max(startRow, endRow);
+    const minCol = Math.min(startCol, endCol);
+    const maxCol = Math.max(startCol, endCol);
+
+    selectedCells = [];
+
+    for (let r = minRow; r <= maxRow; r++) {
+        const row = rows[r];
+
+        for (let c = minCol; c <= maxCol; c++) {
+            if (c === 0) continue;
+
+            const cell = row.cells[c];
+            if (!cell) continue;
+
+            cell.style.outline = "2px solid red";
+
+            selectedCells.push({
+                cell,
+                empId: cell.dataset.emp,
+                date: cell.dataset.date
+            });
+        }
+    }
+
+    console.log("Selected:", selectedCells.length);
+}
+
+function clearSelection() {
+    selectedCells.forEach(item => {
+        item.cell.style.outline = "none";
+    });
+    selectedCells = [];
+}
+
+function editCell(cell, empId, date) {
+    if (!localStorage.getItem("token")) {
+        alert("Login required");
+        return;
+    }
+    const shifts = ["S1","S2","S3","G","WO","CO","GH","LV"];
+
+    if (cell.querySelector("select")) return;
+
+    let dropdown = document.createElement("select");
+
+    let defaultOption = document.createElement("option");
+    defaultOption.value = "";
+    defaultOption.text = "Select";
+    dropdown.appendChild(defaultOption);
+
+    shifts.forEach(s => {
+        let option = document.createElement("option");
+        option.value = s;
+        option.text = s;
+        dropdown.appendChild(option);
+    });
+
+    cell.innerHTML = "";
+    cell.appendChild(dropdown);
+
+    dropdown.focus();
+
+    dropdown.onchange = async function() {
+        const selected = this.value;
+        const oldValue = cell.innerText.trim();
+
+        // ✅ SAVE HISTORY
+        historyStack.push({
+            empId,
+            date,
+            oldValue,
+            newValue: selected
+        });
+
+        redoStack = [];
+
+        await fetch(`/roster-entry?employee_id=${empId}&date=${date}&shift_code=${selected}`, {
+            method: "PUT",
+            headers: {
+                "Authorization": "Bearer " + localStorage.getItem("token")
+            }
+        });
+
+        if (res.status === 401) {
+            alert("Session expired. Please login again.");
+            localStorage.removeItem("token");
+            loadRoster();
+            return;
+        }
+
+        // Update UI
+        cell.innerHTML = selected;
+        applyColor(cell, selected);
+
+        // 🔥 NEW: update summaries
+        updateRowSummary(empId, oldValue, selected);
+        updatePivot(date, oldValue, selected);
+    };
+}
+
+function applyColor(cell, shift) {
+    let color = "#fff";
+
+    if (shift === "S1") color = "#cce5ff";
+    else if (shift === "S2") color = "#ffe5cc";
+    else if (shift === "S3") color = "#e6ccff";
+    else if (shift === "WO") color = "#d6d6d6";
+    else if (shift === "G") color = "#ccffd9";
+    else if (shift === "LV") color = "#ffcccc";
+    else if (shift === "GH") color = "#ffffcc";
+    else if (shift === "CO") color = "#ccf2ff";
+
+    cell.style.background = color;
+}
+
+function updateRowSummary(empId, oldShift, newShift) {
+
+    const row = document.querySelector(`[data-emp="${empId}"]`).parentElement;
+
+    const summaryCells = row.querySelectorAll("td");
+    const totalCols = summaryCells.length;
+
+    // last 8 columns = summary
+    const summaryStart = totalCols - 8;
+
+    const shiftIndex = {
+        S1:0, S2:1, S3:2, G:3, WO:4, CO:5, GH:6, LV:7
+    };
+
+    // decrease old
+    if (shiftIndex[oldShift] !== undefined) {
+        let cell = summaryCells[summaryStart + shiftIndex[oldShift]];
+        cell.innerText = parseInt(cell.innerText) - 1;
+    }
+
+    // increase new
+    if (shiftIndex[newShift] !== undefined) {
+        let cell = summaryCells[summaryStart + shiftIndex[newShift]];
+        cell.innerText = parseInt(cell.innerText) + 1;
+    }
+}
+
+function updatePivot(date, oldShift, newShift) {
+
+    const pivotRows = document.querySelectorAll("tr");
+
+    pivotRows.forEach(row => {
+        const firstCell = row.querySelector("td");
+        if (!firstCell) return;
+
+        const shift = firstCell.innerText.trim();
+
+        const cells = row.querySelectorAll("td");
+
+        // find column index
+        let colIndex = datesGlobal.indexOf(date) + 1;
+
+        if (colIndex <= 0) return;
+
+        // decrease old shift
+        if (shift === oldShift) {
+            let val = parseInt(cells[colIndex].innerText);
+            cells[colIndex].innerText = val - 1;
+        }
+
+        // increase new shift
+        if (shift === newShift) {
+            let val = parseInt(cells[colIndex].innerText);
+            cells[colIndex].innerText = val + 1;
+        }
+    });
+}
+
+function undoLastChange() {
+
+    if (historyStack.length === 0) {
+        alert("Nothing to undo");
+        return;
+    }
+
+    const last = historyStack.pop();
+
+    redoStack.push(last);
+
+    const { empId, date, oldValue, newValue } = last;
+
+    const cell = document.querySelector(
+        `[data-emp="${empId}"][data-date="${date}"]`
+    );
+
+    if (!cell) return;
+
+    // revert UI
+    cell.innerHTML = oldValue;
+    applyColor(cell, oldValue);
+
+    // 🔥 update summaries
+    updateRowSummary(empId, newValue, oldValue);
+    updatePivot(date, newValue, oldValue);
+}
+
+function redoLastChange() {
+
+    if (redoStack.length === 0) {
+        alert("Nothing to redo");
+        return;
+    }
+
+    const last = redoStack.pop();
+
+    // move back to history
+    historyStack.push(last);
+
+    const { empId, date, oldValue, newValue } = last;
+
+    const cell = document.querySelector(
+        `[data-emp="${empId}"][data-date="${date}"]`
+    );
+
+    if (!cell) return;
+
+    cell.innerHTML = newValue;
+    applyColor(cell, newValue);
+
+    updateRowSummary(empId, oldValue, newValue);
+    updatePivot(date, oldValue, newValue);
+}
+
+function reloadRoster() {
+    loadRoster();
+}
+
+function logout() {
+
+    localStorage.removeItem("token");
+
+    alert("Logged out");
+
+    loadRoster(); // reload UI
+}
+
+async function finalizeRoster() {
+
+    const month = document.getElementById("monthSelect").value;
+    const year = document.getElementById("yearSelect").value;
+
+    const res = await fetch(`/roster/finalize?month=${month}&year=${year}`, {
+        method: "PUT",
+        headers: {
+            "Authorization": "Bearer " + localStorage.getItem("token")
+        }
+    });
+
+    if (res.status !== 200) {
+        alert("Failed to finalize");
+        return;
+    }
+
+    alert("Roster finalized");
+
+    loadRoster();
+}
+
+const today = new Date();
+
+const currentMonth = today.getMonth() + 1; // JS month starts from 0
+const currentYear = today.getFullYear();
+
+// set dropdown values
+document.getElementById("monthSelect").value = currentMonth;
+document.getElementById("yearSelect").value = currentYear;
+
+// load roster
+
+loadRoster();
+
+// ✅ ADD THIS BELOW
+document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey && e.key === "z") {
+        e.preventDefault();
+        undoLastChange();
+    }
+
+    // ✅ ADD THIS
+    if (e.ctrlKey && e.key === "y") {
+        e.preventDefault();
+        redoLastChange();
+    }
+
+});
+
+</script>
+
+<div id="bulkDropdown" style="
+    display:none;
+    position:absolute;
+    background:white;
+    border:1px solid #ccc;
+    padding:5px;
+    z-index:1000;
+">
+    <select id="bulkSelect">
+        <option value="">Select Shift</option>
+        <option>S1</option>
+        <option>S2</option>
+        <option>S3</option>
+        <option>G</option>
+        <option>WO</option>
+        <option>CO</option>
+        <option>GH</option>
+        <option>LV</option>
+    </select>
+</div>
+</body>
+</html>

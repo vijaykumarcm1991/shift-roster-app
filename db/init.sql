@@ -19,6 +19,7 @@ CREATE TABLE rosters (
     id SERIAL PRIMARY KEY,
     month INTEGER,
     year INTEGER,
+    status VARCHAR(10) DEFAULT 'DRAFT',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

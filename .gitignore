@@ -1,0 +1,3 @@
+build_start.sh
+git_add_commit_push.sh
+.env
