@@ -1,4 +1,4 @@
-CREATE TABLE employees (
+CREATE TABLE IF NOT EXISTS employees (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100),
     team VARCHAR(100),
@@ -6,7 +6,7 @@ CREATE TABLE employees (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE shifts (
+CREATE TABLE IF NOT EXISTS shifts (
     id SERIAL PRIMARY KEY,
     shift_code VARCHAR(10),
     shift_name VARCHAR(50),
@@ -15,7 +15,7 @@ CREATE TABLE shifts (
     color VARCHAR(20)
 );
 
-CREATE TABLE rosters (
+CREATE TABLE IF NOT EXISTS rosters (
     id SERIAL PRIMARY KEY,
     month INTEGER,
     year INTEGER,
@@ -23,7 +23,7 @@ CREATE TABLE rosters (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE roster_entries (
+CREATE TABLE IF NOT EXISTS roster_entries (
     id SERIAL PRIMARY KEY,
     roster_id INTEGER REFERENCES rosters(id),
     employee_id INTEGER REFERENCES employees(id),
@@ -31,3 +31,23 @@ CREATE TABLE roster_entries (
     shift_id INTEGER REFERENCES shifts(id),
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS admin_users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(100) UNIQUE,
+    password VARCHAR(255),
+    status VARCHAR(20) DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO shifts (shift_code, shift_name)
+VALUES
+('S1','Morning'),
+('S2','Afternoon'),
+('S3','Night'),
+('G','General'),
+('WO','Week Off'),
+('CO','Comp Off'),
+('GH','Holiday'),
+('LV','Leave')
+ON CONFLICT DO NOTHING;

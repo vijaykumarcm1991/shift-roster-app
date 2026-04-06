@@ -119,6 +119,9 @@
     <button onclick="createRoster()">Create Roster</button>
     <button onclick="showAddEmployee()">Add Employee</button>
     <button onclick="deleteEmployee()">Remove Employee</button>
+    <button onclick="exportRoster()">Export Excel</button>
+    <button onclick="showAddAdmin()">Add Admin</button>
+    <button onclick="deleteAdmin()">Remove Admin</button>
 </div>
 <div id="loginBox" style="margin-bottom:15px;">
     <input id="username" placeholder="Username">
@@ -143,7 +146,6 @@ let datesGlobal = [];
 let dragCompleted = false;
 let historyStack = [];
 let redoStack = [];
-let isAdmin = !!localStorage.getItem("token");
 
 async function login() {
 
@@ -161,12 +163,23 @@ async function login() {
         })
     });
 
-    if (res.status !== 200) {
-        alert("Login failed");
+    console.log("Login status:", res.status);
+
+    let data;
+    try {
+        data = await res.json();
+    } catch (e) {
+        console.error("Response parse error:", e);
+        alert("Server error (invalid response)");
         return;
     }
 
-    const data = await res.json();
+    console.log("Login response:", data);
+
+    if (res.status !== 200) {
+        alert(data.detail || "Login failed");
+        return;
+    }
 
     localStorage.setItem("token", data.access_token);
 
@@ -175,6 +188,7 @@ async function login() {
     document.getElementById("loginBox").style.display = "none";
 
     loadRoster();
+
 }
 
 async function loadRoster() {
@@ -378,13 +392,13 @@ async function loadRoster() {
             redoStack = [];
 
             for (let item of selectedCells) {
-                await fetch(`/roster-entry?employee_id=${item.empId}&date=${item.date}&shift_code=${shift}`, {
+                const res = await fetch(`/roster-entry?employee_id=${item.empId}&date=${item.date}&shift_code=${shift}`, {
                     method: "PUT",
                     headers: {
                         "Authorization": "Bearer " + localStorage.getItem("token")
                     }
                 });
-                
+
                 if (res.status === 401) {
                     alert("Session expired. Please login again.");
                     localStorage.removeItem("token");
@@ -423,6 +437,7 @@ async function loadRoster() {
     const createBtn = document.querySelector("button[onclick='createRoster()']");
     const addBtn = document.querySelector("button[onclick='showAddEmployee()']");
     const delBtn = document.querySelector("button[onclick='deleteEmployee()']");
+    const adminBtns = document.querySelectorAll("button[onclick='showAddAdmin()'], button[onclick='deleteAdmin()']");
 
     if (!token) {
         document.getElementById("undoBtn").style.display = "none";
@@ -434,6 +449,7 @@ async function loadRoster() {
         if (createBtn) createBtn.style.display = "none";
         if (addBtn) addBtn.style.display = "none";
         if (delBtn) delBtn.style.display = "none";
+        adminBtns.forEach(btn => btn.style.display = "none");
 
     } else {
         document.getElementById("undoBtn").style.display = "inline-block";
@@ -445,8 +461,8 @@ async function loadRoster() {
         if (createBtn) createBtn.style.display = "inline-block";
         if (addBtn) addBtn.style.display = "inline-block";
         if (delBtn) delBtn.style.display = "inline-block";
-    }
-
+        adminBtns.forEach(btn => btn.style.display = "inline-block");
+}
     attachEvents(); // ✅ IMPORTANT
 }
 
@@ -594,7 +610,7 @@ function editCell(cell, empId, date) {
 
         redoStack = [];
 
-        await fetch(`/roster-entry?employee_id=${empId}&date=${date}&shift_code=${selected}`, {
+        const res = await fetch(`/roster-entry?employee_id=${empId}&date=${date}&shift_code=${selected}`, {
             method: "PUT",
             headers: {
                 "Authorization": "Bearer " + localStorage.getItem("token")
@@ -901,6 +917,87 @@ function closeEmployeePopup() {
     document.getElementById("employeePopup").style.display = "none";
 }
 
+function exportRoster() {
+
+    const month = document.getElementById("monthSelect").value;
+    const year = document.getElementById("yearSelect").value;
+
+    window.open(`/roster/export?month=${month}&year=${year}`, "_blank");
+}
+
+async function showAddAdmin() {
+
+    const username = prompt("Enter admin username:");
+    if (!username) return;
+
+    const password = prompt("Enter password:");
+    if (!password) return;
+
+    const res = await fetch("/admin-users", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + localStorage.getItem("token")
+        },
+        body: JSON.stringify({ username, password })
+    });
+
+    if (res.status !== 200) {
+        alert("Failed to add admin");
+        return;
+    }
+
+    alert("Admin added successfully");
+}
+
+async function deleteAdmin() {
+
+    const res = await fetch("/admin-users", {
+        headers: {
+            "Authorization": "Bearer " + localStorage.getItem("token")
+        }
+    });
+
+    const admins = await res.json();
+
+    const id = prompt(
+        "Enter admin ID to delete:\n" +
+        admins.map(a => `${a.id} - ${a.username}`).join("\n")
+    );
+
+    if (!id) return;
+
+    await fetch(`/admin-users/${id}`, {
+        method: "DELETE",
+        headers: {
+            "Authorization": "Bearer " + localStorage.getItem("token")
+        }
+    });
+
+    alert("Admin removed");
+}
+
+function applyRoleUI() {
+    const token = localStorage.getItem("token");
+
+    const adminBtns = document.querySelectorAll("button[onclick='showAddAdmin()'], button[onclick='deleteAdmin()']");
+    const createBtn = document.querySelector("button[onclick='createRoster()']");
+    const addBtn = document.querySelector("button[onclick='showAddEmployee()']");
+    const delBtn = document.querySelector("button[onclick='deleteEmployee()']");
+
+    if (!token) {
+        adminBtns.forEach(btn => btn.style.display = "none");
+        if (createBtn) createBtn.style.display = "none";
+        if (addBtn) addBtn.style.display = "none";
+        if (delBtn) delBtn.style.display = "none";
+    } else {
+        adminBtns.forEach(btn => btn.style.display = "inline-block");
+        if (createBtn) createBtn.style.display = "inline-block";
+        if (addBtn) addBtn.style.display = "inline-block";
+        if (delBtn) delBtn.style.display = "inline-block";
+    }
+}
+
 const today = new Date();
 
 const currentMonth = today.getMonth() + 1; // JS month starts from 0
@@ -912,6 +1009,7 @@ document.getElementById("yearSelect").value = currentYear;
 
 // load roster
 
+applyRoleUI();
 loadRoster();
 
 // ✅ ADD THIS BELOW

@@ -1,6 +1,7 @@
 from urllib import response
 from app.models import roster
-from fastapi import APIRouter, Depends, HTTPException, Body
+from app.models.admin_user import AdminUser
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import date, timedelta
 import calendar
@@ -13,6 +14,12 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
+from fastapi.responses import StreamingResponse
+from io import BytesIO
+from openpyxl import Workbook
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+from passlib.context import CryptContext
+from sqlalchemy.exc import ProgrammingError
 
 router = APIRouter()
 
@@ -25,6 +32,8 @@ security = HTTPBearer()
 class EmployeeCreate(BaseModel):
     name: str
     team: str
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def get_db():
     db = SessionLocal()
@@ -41,24 +50,31 @@ def create_access_token(data: dict):
 
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-from pydantic import BaseModel
-
 class LoginRequest(BaseModel):
     username: str
     password: str
 
-
 @router.post("/login")
-def login(data: LoginRequest):
+def login(data: LoginRequest, db: Session = Depends(get_db)):
 
+    # 👉 1. Try DB login (safe)
+    try:
+        admin = db.query(AdminUser).filter(
+            AdminUser.username == data.username,
+            AdminUser.status == "active"
+        ).first()
+
+        if admin and admin.password and pwd_context.verify(data.password, admin.password):
+            token = create_access_token({"sub": data.username})
+            return {"access_token": token, "token_type": "bearer"}
+
+    except ProgrammingError:
+        db.rollback()  # 🔥 VERY IMPORTANT
+
+    # 👉 2. Fallback (ALWAYS WORKS)
     if data.username == "admin" and data.password == "admin123":
-
         token = create_access_token({"sub": data.username})
-
-        return {
-            "access_token": token,
-            "token_type": "bearer"
-        }
+        return {"access_token": token, "token_type": "bearer"}
 
     raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -403,3 +419,295 @@ def get_employees(db: Session = Depends(get_db)):
         }
         for emp in employees
     ]
+
+@router.get("/roster/export")
+def export_roster(month: int, year: int, db: Session = Depends(get_db)):
+
+    roster = db.query(Roster).filter(
+        Roster.month == month,
+        Roster.year == year
+    ).order_by(Roster.id.desc()).first()
+
+    if not roster:
+        raise HTTPException(status_code=404, detail="Roster not found")
+
+    entries = db.query(RosterEntry).filter_by(roster_id=roster.id).all()
+
+    result = {}
+
+    for entry in entries:
+        emp_id = entry.employee_id
+
+        if emp_id not in result:
+            emp = db.query(Employee).filter_by(id=emp_id).first()
+            result[emp_id] = {
+                "name": emp.name,
+                "team": emp.team,
+                "shifts": {}
+            }
+
+        shift_code = None
+        if entry.shift_id:
+            shift = db.query(Shift).filter_by(id=entry.shift_id).first()
+            shift_code = shift.shift_code
+
+        result[emp_id]["shifts"][str(entry.date)] = shift_code
+
+    employees = list(result.values())
+    dates = sorted(next(iter(result.values()))["shifts"].keys())
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Roster"
+
+    # Styles
+    header_font = Font(bold=True)
+    center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    thin_border = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+
+    # Colors
+    colors = {
+        "S1": "ADD8E6", "S2": "FFDAB9", "S3": "DDA0DD",
+        "G": "90EE90", "WO": "D3D3D3",
+        "LV": "FFB6C1", "GH": "FFFFE0", "CO": "E0FFFF"
+    }
+
+    from datetime import datetime
+    from collections import defaultdict
+
+    # =========================
+    # HEADER
+    # =========================
+    headers = ["Employee"]
+
+    weekend_cols = []
+
+    for idx, d in enumerate(dates):
+        dt = datetime.strptime(d, "%Y-%m-%d")
+        headers.append(f"{dt.strftime('%a')}\n{dt.day}")
+
+        if dt.weekday() >= 5:
+            weekend_cols.append(idx + 2)  # excel col index
+
+    headers += [""]  # spacer
+    headers += ["S1","S2","S3","G","WO","CO","GH","LV"]
+
+    ws.append(headers)
+
+    # style header
+    for col_idx, cell in enumerate(ws[1], start=1):
+        cell.font = header_font
+        cell.alignment = center_align
+        cell.border = thin_border
+
+        if col_idx in weekend_cols:
+            cell.fill = PatternFill(start_color="FFECEC", end_color="FFECEC", fill_type="solid")
+
+    current_row = 2
+
+    # =========================
+    # GROUP BY TEAM
+    # =========================
+    grouped = defaultdict(list)
+    for emp in employees:
+        grouped[emp["team"]].append(emp)
+
+    for team, emps in grouped.items():
+
+        # Team header
+        ws.cell(row=current_row, column=1, value=team).font = Font(bold=True)
+        current_row += 1
+
+        # =========================
+        # EMPLOYEE ROWS
+        # =========================
+        for emp in emps:
+
+            counts = {k:0 for k in ["S1","S2","S3","G","WO","CO","GH","LV"]}
+
+            row = [emp["name"]]
+
+            for d in dates:
+                shift = emp["shifts"][d] or "-"
+                row.append(shift)
+
+                if shift in counts:
+                    counts[shift] += 1
+
+            row += [""]  # spacer
+            row += list(counts.values())
+
+            ws.append(row)
+
+            for col_idx, cell in enumerate(ws[current_row], start=1):
+
+                cell.alignment = center_align
+                cell.border = thin_border
+
+                # Shift cells
+                if 1 < col_idx <= len(dates)+1:
+                    val = cell.value
+
+                    dt = datetime.strptime(dates[col_idx-2], "%Y-%m-%d")
+
+                    # Weekend blank highlight
+                    if dt.weekday() >= 5 and val == "-":
+                        cell.fill = PatternFill(start_color="FFF5F5", end_color="FFF5F5", fill_type="solid")
+
+                    # Shift color
+                    elif val in colors:
+                        cell.fill = PatternFill(start_color=colors[val], end_color=colors[val], fill_type="solid")
+
+                # Summary cells
+                if col_idx > len(dates)+2:
+                    val = cell.value
+
+                    if val > 2:
+                        cell.fill = PatternFill(start_color="28A745", end_color="28A745", fill_type="solid")
+                        cell.font = Font(color="FFFFFF", bold=True)
+                    elif val < 2:
+                        cell.fill = PatternFill(start_color="DC3545", end_color="DC3545", fill_type="solid")
+                        cell.font = Font(color="FFFFFF", bold=True)
+
+            current_row += 1
+
+        # =========================
+        # SPACER ROW
+        # =========================
+        ws.append([""] * len(headers))
+        current_row += 1
+
+        # =========================
+        # SHIFT SUMMARY TITLE
+        # =========================
+        ws.append(["Shift Summary"] + [""]*(len(headers)-1))
+        current_row += 1
+
+        # =========================
+        # PIVOT (COLUMN SUMMARY)
+        # =========================
+        pivot = {
+            "S1":{}, "S2":{}, "S3":{}, "G":{},
+            "WO":{}, "CO":{}, "GH":{}, "LV":{}
+        }
+
+        for d in dates:
+            for shift in pivot:
+                pivot[shift][d] = 0
+
+        for emp in emps:
+            for d in dates:
+                shift = emp["shifts"][d]
+                if shift in pivot:
+                    pivot[shift][d] += 1
+
+        for shift, values in pivot.items():
+
+            row = [shift]
+
+            for d in dates:
+                row.append(values[d])
+
+            row += [""] * 9  # spacer + summary
+
+            ws.append(row)
+
+            for col_idx, cell in enumerate(ws[current_row], start=1):
+
+                cell.alignment = center_align
+                cell.border = thin_border
+
+                if 1 < col_idx <= len(dates)+1:
+                    val = cell.value
+
+                    if val > 2:
+                        cell.fill = PatternFill(start_color="28A745", end_color="28A745", fill_type="solid")
+                        cell.font = Font(color="FFFFFF", bold=True)
+                    elif val < 2:
+                        cell.fill = PatternFill(start_color="DC3545", end_color="DC3545", fill_type="solid")
+                        cell.font = Font(color="FFFFFF", bold=True)
+
+            current_row += 1
+
+        current_row += 2  # space between teams
+
+    # =========================
+    # AUTO WIDTH
+    # =========================
+    for col in ws.columns:
+        max_length = 0
+        col_letter = col[0].column_letter
+
+        for cell in col:
+            if cell.value:
+                max_length = max(max_length, len(str(cell.value)))
+
+        ws.column_dimensions[col_letter].width = max_length + 2
+
+    # Freeze header
+    ws.freeze_panes = "B2"
+
+    # Save
+    file_stream = BytesIO()
+    wb.save(file_stream)
+    file_stream.seek(0)
+
+    return StreamingResponse(
+        file_stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=roster_{month}_{year}.xlsx"}
+    )
+
+@router.post("/admin-users")
+def add_admin(
+    data: dict,
+    db: Session = Depends(get_db),
+    user=Depends(verify_token)
+):
+    username = data.get("username")
+    password = data.get("password")
+
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="Username & password required")
+
+    password = password[:72]  # 🔥 FIX bcrypt limit
+    if len(password) > 72:
+        raise HTTPException(status_code=400, detail="Password too long (max 72 chars)")
+
+    hashed = pwd_context.hash(password)
+
+    admin = AdminUser(
+        username=username,
+        password=hashed
+    )
+
+    db.add(admin)
+    db.commit()
+
+    return {"message": "Admin created"}
+
+@router.get("/admin-users")
+def list_admins(db: Session = Depends(get_db), user=Depends(verify_token)):
+
+    admins = db.query(AdminUser).filter(AdminUser.status == "active").all()
+
+    return [{"id": a.id, "username": a.username} for a in admins]
+
+@router.delete("/admin-users/{admin_id}")
+def delete_admin(
+    admin_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(verify_token)
+):
+    admin = db.query(AdminUser).filter(AdminUser.id == admin_id).first()
+
+    if not admin:
+        raise HTTPException(status_code=404, detail="Admin not found")
+
+    admin.status = "inactive"
+    db.commit()
+
+    return {"message": "Admin removed"}
