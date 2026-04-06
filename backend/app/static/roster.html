@@ -109,6 +109,12 @@
             border-left: 10px solid transparent;
         }
 
+        th {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
     </style>
 </head>
 <body>
@@ -132,6 +138,7 @@
 
     <button onclick="reloadRoster()">Load</button>
     <button onclick="createRoster()">Create Roster</button>
+    <button onclick="toggleAudit()">📜 Audit Logs</button>
     <button onclick="showAddEmployee()">Add Employee</button>
     <button onclick="deleteEmployee()">Remove Employee</button>
     <button onclick="exportRoster()">Export Excel</button>
@@ -149,6 +156,34 @@
 <button id="logoutBtn" onclick="logout()">Logout</button>
 <button id="finalizeBtn" onclick="finalizeRoster()">Finalize</button>
 <span id="statusLabel" style="margin-left:10px; font-weight:bold;"></span>
+<div id="auditOverlay" style="
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.2);
+    display: none;
+    z-index: 9998;
+"></div>
+<div id="auditPanel" style="
+    position: fixed;
+    right: 0;
+    top: 0;
+    width: 320px;
+    height: 100%;
+    background: white;
+    border-left: 1px solid #ccc;
+    overflow-y: auto;
+    padding: 12px;
+    z-index: 9999;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    box-shadow: -4px 0 15px rgba(0,0,0,0.2);
+">
+    <h3>Audit Logs</h3>
+    <div id="auditContent"></div>
+</div>
 <div id="rosterTable"></div>
 
 <script>
@@ -161,6 +196,7 @@ let datesGlobal = [];
 let dragCompleted = false;
 let historyStack = [];
 let redoStack = [];
+let auditOpen = false;
 
 async function login() {
 
@@ -555,6 +591,7 @@ function attachEvents() {
 
             cell.title = comment;
             cell.classList.add("comment-cell");
+            loadAuditLogs();
         });
 
     });
@@ -690,11 +727,13 @@ function editCell(cell, empId, date) {
         if (existingComment) {
             cell.title = existingComment;
             cell.classList.add("comment-cell");
+            loadAuditLogs();
         }
 
         // 🔥 NEW: update summaries
         updateRowSummary(empId, oldValue, selected);
         updatePivot(date, oldValue, selected);
+        loadAuditLogs(); 
     };
 }
 
@@ -1062,6 +1101,66 @@ function applyRoleUI() {
     }
 }
 
+async function loadAuditLogs() {
+
+    const month = document.getElementById("monthSelect").value;
+    const year = document.getElementById("yearSelect").value;
+
+    const res = await fetch(`/audit-logs?month=${month}&year=${year}`);
+    const data = await res.json();
+
+    let html = "";
+
+    data.forEach(log => {
+
+        let text = "";
+
+        if (log.old === "COMMENT") {
+            text = `💬 ${log.user} added comment for ${log.employee}`;
+        } else {
+            text = `🔄 ${log.user} changed ${log.employee}: ${log.old || '-'} → ${log.new}`;
+        }
+
+        html += `
+            <div style="border-bottom:1px solid #eee; padding:6px;">
+                <div><b>${text}</b></div>
+                <div style="font-size:11px; color:gray;">
+                    ${log.date} | ${log.user} | ${log.time}
+                </div>
+            </div>
+        `;
+    });
+
+    document.getElementById("auditContent").innerHTML = html;
+}
+
+function toggleAudit() {
+
+    const panel = document.getElementById("auditPanel");
+    const overlay = document.getElementById("auditOverlay");
+
+    if (auditOpen) {
+        panel.style.transform = "translateX(100%)";  // close
+        overlay.style.display = "none";
+    } else {
+        panel.style.transform = "translateX(0%)";    // open
+        overlay.style.display = "block";
+        loadAuditLogs();
+    }
+
+    auditOpen = !auditOpen;
+}
+
+document.getElementById("auditOverlay").onclick = function () {
+    toggleAudit();
+};
+
+document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && auditOpen) {
+        toggleAudit();
+    }
+});
+
 const today = new Date();
 
 const currentMonth = today.getMonth() + 1; // JS month starts from 0
@@ -1089,6 +1188,11 @@ document.addEventListener("keydown", (e) => {
         redoLastChange();
     }
 
+});
+
+document.addEventListener("DOMContentLoaded", function () {
+    const panel = document.getElementById("auditPanel");
+    panel.style.transform = "translateX(100%)";
 });
 
 </script>

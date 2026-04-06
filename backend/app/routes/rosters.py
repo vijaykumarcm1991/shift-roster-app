@@ -782,3 +782,43 @@ def add_comment(
     db.commit()
 
     return {"message": "Comment added"}
+
+@router.get("/audit-logs")
+def get_audit_logs(month: int, year: int, db: Session = Depends(get_db)):
+
+    roster = db.query(Roster).filter(
+        Roster.month == month,
+        Roster.year == year
+    ).order_by(Roster.id.desc()).first()
+
+    if not roster:
+        return []
+
+    logs = db.execute(text("""
+        SELECT 
+            a.employee_id,
+            e.name,
+            a.date,
+            a.old_shift,
+            a.new_shift,
+            a.changed_by,
+            a.changed_at
+        FROM audit_logs a
+        JOIN employees e ON e.id = a.employee_id
+        ORDER BY a.changed_at DESC
+        LIMIT 200
+    """)).fetchall()
+
+    result = []
+
+    for row in logs:
+        result.append({
+            "employee": row.name,
+            "date": str(row.date),
+            "old": row.old_shift,
+            "new": row.new_shift,
+            "user": row.changed_by,
+            "time": row.changed_at.strftime("%Y-%m-%d %H:%M")
+        })
+
+    return result
