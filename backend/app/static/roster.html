@@ -116,6 +116,9 @@
     <input type="number" id="yearSelect" value="2026" style="width:80px;">
 
     <button onclick="reloadRoster()">Load</button>
+    <button onclick="createRoster()">Create Roster</button>
+    <button onclick="showAddEmployee()">Add Employee</button>
+    <button onclick="deleteEmployee()">Remove Employee</button>
 </div>
 <div id="loginBox" style="margin-bottom:15px;">
     <input id="username" placeholder="Username">
@@ -417,18 +420,31 @@ async function loadRoster() {
 
     const token = localStorage.getItem("token");
 
+    const createBtn = document.querySelector("button[onclick='createRoster()']");
+    const addBtn = document.querySelector("button[onclick='showAddEmployee()']");
+    const delBtn = document.querySelector("button[onclick='deleteEmployee()']");
+
     if (!token) {
         document.getElementById("undoBtn").style.display = "none";
         document.getElementById("redoBtn").style.display = "none";
         document.getElementById("logoutBtn").style.display = "none";
         document.getElementById("loginBox").style.display = "block";
         document.getElementById("finalizeBtn").style.display = "none";
+
+        if (createBtn) createBtn.style.display = "none";
+        if (addBtn) addBtn.style.display = "none";
+        if (delBtn) delBtn.style.display = "none";
+
     } else {
         document.getElementById("undoBtn").style.display = "inline-block";
         document.getElementById("redoBtn").style.display = "inline-block";
         document.getElementById("logoutBtn").style.display = "inline-block";
         document.getElementById("loginBox").style.display = "none";
         document.getElementById("finalizeBtn").style.display = "inline-block";
+
+        if (createBtn) createBtn.style.display = "inline-block";
+        if (addBtn) addBtn.style.display = "inline-block";
+        if (delBtn) delBtn.style.display = "inline-block";
     }
 
     attachEvents(); // ✅ IMPORTANT
@@ -765,6 +781,126 @@ async function finalizeRoster() {
     loadRoster();
 }
 
+async function createRoster() {
+
+    if (!localStorage.getItem("token")) {
+        alert("Admin login required");
+        return;
+    }
+
+    if (!confirm("Create empty roster for selected month?")) {
+        return;
+    }
+
+    const month = document.getElementById("monthSelect").value;
+    const year = document.getElementById("yearSelect").value;
+
+    const res = await fetch(`/rosters?month=${month}&year=${year}`, {
+        method: "POST",
+        headers: {
+            "Authorization": "Bearer " + localStorage.getItem("token")
+        }
+    });
+
+    const data = await res.json();
+
+    if (res.status !== 200) {
+        alert(data.detail || "Failed to create roster");
+        return;
+    }
+
+    alert("Empty roster created successfully");
+
+    loadRoster(); // reload UI
+}
+
+async function showAddEmployee() {
+
+    if (!localStorage.getItem("token")) {
+        alert("Admin login required");
+        return;
+    }
+
+    const name = prompt("Enter employee name:");
+    if (!name) return;
+
+    const team = prompt("Enter team:");
+    if (!team) return;
+
+    const res = await fetch("/employees", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + localStorage.getItem("token")
+        },
+        body: JSON.stringify({ name, team })
+    });
+
+    const data = await res.json();
+
+    if (res.status !== 200) {
+        alert("Failed to add employee");
+        return;
+    }
+
+    alert("Employee added successfully");
+
+    loadRoster();
+}
+
+async function deleteEmployee() {
+
+    if (!localStorage.getItem("token")) {
+        alert("Admin login required");
+        return;
+    }
+
+    const res = await fetch("/employees");
+    const employees = await res.json();
+
+    const dropdown = document.getElementById("employeeDropdown");
+    dropdown.innerHTML = "";
+
+    employees.forEach(emp => {
+        const option = document.createElement("option");
+        option.value = emp.id;
+        option.text = `${emp.name} (${emp.team})`;
+        dropdown.appendChild(option);
+    });
+
+    document.getElementById("employeePopup").style.display = "block";
+}
+
+async function confirmDeleteEmployee() {
+
+    const empId = document.getElementById("employeeDropdown").value;
+
+    if (!confirm("Are you sure you want to remove this employee?")) return;
+
+    const res = await fetch(`/employees/${empId}`, {
+        method: "DELETE",
+        headers: {
+            "Authorization": "Bearer " + localStorage.getItem("token")
+        }
+    });
+
+    const data = await res.json();
+
+    if (res.status !== 200) {
+        alert(data.detail || "Failed to delete employee");
+        return;
+    }
+
+    alert("Employee removed");
+
+    closeEmployeePopup();
+    loadRoster();
+}
+
+function closeEmployeePopup() {
+    document.getElementById("employeePopup").style.display = "none";
+}
+
 const today = new Date();
 
 const currentMonth = today.getMonth() + 1; // JS month starts from 0
@@ -814,6 +950,26 @@ document.addEventListener("keydown", (e) => {
         <option>GH</option>
         <option>LV</option>
     </select>
+</div>
+<div id="employeePopup" style="
+    display:none;
+    position:fixed;
+    top:30%;
+    left:40%;
+    background:white;
+    padding:15px;
+    border:1px solid #ccc;
+    box-shadow:0 2px 10px rgba(0,0,0,0.2);
+    z-index:2000;
+">
+    <h4>Select Employee</h4>
+
+    <select id="employeeDropdown"></select>
+
+    <br><br>
+
+    <button onclick="confirmDeleteEmployee()">Delete</button>
+    <button onclick="closeEmployeePopup()">Cancel</button>
 </div>
 </body>
 </html>

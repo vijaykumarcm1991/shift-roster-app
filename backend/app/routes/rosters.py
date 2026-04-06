@@ -1,7 +1,6 @@
 from urllib import response
-
 from app.models import roster
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from datetime import date, timedelta
 import calendar
@@ -12,8 +11,8 @@ from app.models.employee import Employee
 from app.models.shift import Shift
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
-from fastapi import HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -22,6 +21,10 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 security = HTTPBearer()
+
+class EmployeeCreate(BaseModel):
+    name: str
+    team: str
 
 def get_db():
     db = SessionLocal()
@@ -71,7 +74,16 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
         raise HTTPException(status_code=401, detail="Invalid token")
 
 @router.post("/rosters")
-def create_roster(month: int, year: int, db: Session = Depends(get_db)):
+def create_roster(month: int, year: int, db: Session = Depends(get_db), user=Depends(verify_token)):
+
+    # ❌ prevent duplicate roster
+    existing = db.query(Roster).filter(
+        Roster.month == month,
+        Roster.year == year
+    ).first()
+
+    if existing:
+        raise HTTPException(status_code=400, detail="Roster already exists")
 
     # create roster record
     roster = Roster(month=month, year=year)
@@ -309,3 +321,85 @@ def finalize_roster(month: int, year: int, db: Session = Depends(get_db), user=D
     db.commit()
 
     return {"message": "Roster finalized"}
+
+@router.post("/employees")
+def add_employee(
+    data: dict,
+    db: Session = Depends(get_db),
+    user=Depends(verify_token)
+):
+    name = data.get("name")
+    team = data.get("team")
+
+    if not name or not team:
+        raise HTTPException(status_code=400, detail="Name and team required")
+
+    emp = Employee(
+        name=name,
+        team=team,
+        status="active"
+    )
+
+    db.add(emp)
+    db.commit()
+    db.refresh(emp)
+
+    # 👉 ADD THIS BLOCK
+
+    # get latest roster
+    latest_roster = db.query(Roster).order_by(Roster.id.desc()).first()
+
+    if latest_roster:
+        import calendar
+        from datetime import date, timedelta
+
+        days_in_month = calendar.monthrange(latest_roster.year, latest_roster.month)[1]
+        start_date = date(latest_roster.year, latest_roster.month, 1)
+
+        entries = []
+
+        for i in range(days_in_month):
+            roster_date = start_date + timedelta(days=i)
+
+            entry = RosterEntry(
+                roster_id=latest_roster.id,
+                employee_id=emp.id,
+                date=roster_date,
+                shift_id=None
+            )
+            entries.append(entry)
+
+        db.bulk_save_objects(entries)
+        db.commit()
+
+    return {"message": "Employee added", "id": emp.id}
+
+@router.delete("/employees/{emp_id}")
+def delete_employee(
+    emp_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(verify_token)
+):
+    emp = db.query(Employee).filter(Employee.id == emp_id).first()
+
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    emp.status = "inactive"  # ✅ soft delete
+    db.commit()
+
+    return {"message": "Employee removed"}
+
+@router.get("/employees")
+def get_employees(db: Session = Depends(get_db)):
+
+    employees = db.query(Employee).filter(Employee.status == "active").all()
+
+    return [
+        {
+            "id": emp.id,
+            "name": emp.name,
+            "team": emp.team
+        }
+        for emp in employees
+    ]
