@@ -94,6 +94,21 @@
             background: #4338ca;
         }
 
+        .comment-cell {
+            position: relative;
+        }
+
+        .comment-cell::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 0;
+            height: 0;
+            border-top: 10px solid red;
+            border-left: 10px solid transparent;
+        }
+
     </style>
 </head>
 <body>
@@ -261,6 +276,7 @@ async function loadRoster() {
 
             dates.forEach(d => {
                 const shift = emp.shifts[d] || '-';
+                const comment = emp.comments ? emp.comments[d] : null;
 
                 if (counts[shift] !== undefined) {
                     counts[shift]++;
@@ -286,9 +302,17 @@ async function loadRoster() {
                     bgColor = "#fff5f5";
                 }
 
-                html += `<td style="background:${bgColor}"
+                let extraClass = "";
+
+                if (comment) {
+                    extraClass = "comment-cell";
+                }
+
+                html += `<td class="${extraClass}"
+                            style="background:${bgColor}"
                             data-emp="${emp.employee_id}"
-                            data-date="${d}">
+                            data-date="${d}"
+                            title="${comment || ''}">
                             ${shift}
                         </td>`;
             });
@@ -334,6 +358,7 @@ async function loadRoster() {
         groups[team].forEach(emp => {
             dates.forEach(d => {
                 const shift = emp.shifts[d] || '-';
+                const comment = emp.comments ? emp.comments[d] : null;
 
                 if (pivot[shift]) {
                     pivot[shift][d]++;
@@ -417,9 +442,16 @@ async function loadRoster() {
 
                 // redoStack = []; // ✅ CLEAR REDO STACK
 
+                const existingComment = item.cell.title;
+
                 item.cell.innerHTML = shift;
                 applyColor(item.cell, shift);
 
+                // restore comment style
+                if (existingComment) {
+                    item.cell.title = existingComment;
+                    item.cell.style.outline = "2px solid orange";
+                }
                 // 🔥 ADD THIS
                 updateRowSummary(item.empId, oldValue, shift);
                 updatePivot(item.date, oldValue, shift);
@@ -498,6 +530,33 @@ function attachEvents() {
 
             editCell(cell, cell.dataset.emp, cell.dataset.date);
         });
+
+        cell.addEventListener("contextmenu", async (e) => {
+            e.preventDefault();
+
+            if (!localStorage.getItem("token")) {
+                alert("Login required");
+                return;
+            }
+
+            const empId = cell.dataset.emp;
+            const date = cell.dataset.date;
+
+            const comment = prompt("Enter comment:");
+
+            if (comment === null) return;
+
+            await fetch(`/roster-entry/comment?employee_id=${empId}&date=${date}&comment=${encodeURIComponent(comment)}`, {
+                method: "PUT",
+                headers: {
+                    "Authorization": "Bearer " + localStorage.getItem("token")
+                }
+            });
+
+            cell.title = comment;
+            cell.classList.add("comment-cell");
+        });
+
     });
 
     document.addEventListener("mouseup", (e) => {
@@ -624,9 +683,14 @@ function editCell(cell, empId, date) {
             return;
         }
 
-        // Update UI
-        cell.innerHTML = selected;
+        const existingComment = cell.title;
+
         applyColor(cell, selected);
+
+        if (existingComment) {
+            cell.title = existingComment;
+            cell.classList.add("comment-cell");
+        }
 
         // 🔥 NEW: update summaries
         updateRowSummary(empId, oldValue, selected);

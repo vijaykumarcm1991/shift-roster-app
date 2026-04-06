@@ -1,0 +1,18 @@
+INFO:     172.19.16.135:59018 - "GET /static/roster.html HTTP/1.1" 200 OK
+INFO:     172.19.16.135:59018 - "GET /roster?month=4&year=2026 HTTP/1.1" 500 Internal Server Error
+INFO:     172.19.16.135:65000 - "GET /static/roster.html HTTP/1.1" 304 Not Modified
+INFO:     172.19.16.135:65000 - "GET /roster?month=4&year=2026 HTTP/1.1" 500 Internal Server Error
+INFO:     172.19.16.135:61293 - "GET /static/roster.html HTTP/1.1" 304 Not Modified
+INFO:     172.19.16.135:61293 - "GET /roster?month=4&year=2026 HTTP/1.1" 500 Internal Server Error
+INFO:     172.19.16.135:61611 - "GET /roster?month=4&year=2026 HTTP/1.1" 500 Internal Server Error
+INFO:     172.19.16.135:58352 - "GET /static/roster.html HTTP/1.1" 304 Not Modified
+INFO:     172.19.16.135:58352 - "GET /roster?month=4&year=2026 HTTP/1.1" 500 Internal Server Error
+INFO:     172.19.16.135:59018 - "GET /static/roster.html HTTP/1.1" 200 OK
+INFO:     172.19.16.135:59018 - "GET /roster?month=4&year=2026 HTTP/1.1" 500 Internal Server Error
+INFO:     172.19.16.135:65000 - "GET /static/roster.html HTTP/1.1" 304 Not Modified
+INFO:     172.19.16.135:65000 - "GET /roster?month=4&year=2026 HTTP/1.1" 500 Internal Server Error
+INFO:     172.19.16.135:61293 - "GET /static/roster.html HTTP/1.1" 304 Not Modified
+INFO:     172.19.16.135:61293 - "GET /roster?month=4&year=2026 HTTP/1.1" 500 Internal Server Error
+INFO:     172.19.16.135:61611 - "GET /roster?month=4&year=2026 HTTP/1.1" 500 Internal Server Error
+INFO:     172.19.16.135:58352 - "GET /static/roster.html HTTP/1.1" 304 Not Modified
+INFO:     172.19.16.135:58352 - "GET /roster?month=4&year=2026 HTTP/1.1" 500 Internal Server Error

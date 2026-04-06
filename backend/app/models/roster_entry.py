@@ -1,5 +1,5 @@
-from sqlalchemy import Column, Integer, Date, ForeignKey, TIMESTAMP
-from sqlalchemy.sql import func
+from sqlalchemy import Column, Integer, Date, ForeignKey, DateTime, String
+from datetime import datetime
 from app.database.connection import Base
 
 class RosterEntry(Base):
@@ -10,4 +10,8 @@ class RosterEntry(Base):
     employee_id = Column(Integer, ForeignKey("employees.id"))
     date = Column(Date)
     shift_id = Column(Integer, ForeignKey("shifts.id"), nullable=True)
-    updated_at = Column(TIMESTAMP, server_default=func.now())
+
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+    # ✅ CLEAN COMMENT COLUMN
+    comment = Column(String, nullable=True)

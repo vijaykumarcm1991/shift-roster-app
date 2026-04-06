@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS roster_entries (
     employee_id INTEGER REFERENCES employees(id),
     date DATE,
     shift_id INTEGER REFERENCES shifts(id),
+    comment TEXT,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -51,3 +52,13 @@ VALUES
 ('GH','Holiday'),
 ('LV','Leave')
 ON CONFLICT DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id SERIAL PRIMARY KEY,
+    employee_id INT,
+    date DATE,
+    old_shift VARCHAR(10),
+    new_shift VARCHAR(10),
+    changed_by VARCHAR(100),
+    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

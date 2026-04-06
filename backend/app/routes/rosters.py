@@ -20,6 +20,7 @@ from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from passlib.context import CryptContext
 from sqlalchemy.exc import ProgrammingError
+from sqlalchemy import text
 
 router = APIRouter()
 
@@ -162,7 +163,8 @@ def get_roster(month: int, year: int, db: Session = Depends(get_db)):
                 "employee_id": emp_id,
                 "employee_name": employee.name,
                 "team": employee.team,
-                "shifts": {}
+                "shifts": {},
+                "comments": {} 
             }
 
         # Get shift code
@@ -173,6 +175,7 @@ def get_roster(month: int, year: int, db: Session = Depends(get_db)):
 
         # IMPORTANT: add shift (DON’T overwrite)
         result[emp_id]["shifts"][str(entry.date)] = shift_code
+        result[emp_id]["comments"][str(entry.date)] = entry.comment or ""
     
     response = list(result.values())
 
@@ -210,8 +213,26 @@ def update_roster_entry(
     if not entry:
         return {"error": "Roster entry not found"}
 
-    # Update shift
+    # 👉 GET OLD SHIFT
+    old_shift = None
+    if entry.shift_id:
+        old = db.query(Shift).filter_by(id=entry.shift_id).first()
+        old_shift = old.shift_code if old else None
+
+    # 👉 UPDATE SHIFT
     entry.shift_id = shift.id
+
+    # 👉 INSERT AUDIT LOG
+    db.execute(text("""
+        INSERT INTO audit_logs (employee_id, date, old_shift, new_shift, changed_by)
+        VALUES (:emp, :date, :old, :new, :user)
+    """), {
+        "emp": employee_id,
+        "date": roster_date,
+        "old": old_shift,
+        "new": shift_code,
+        "user": user.get("sub")
+    })
 
     db.commit()
 
@@ -248,7 +269,26 @@ def bulk_update_roster(
         ).first()
 
         if entry:
+            # old shift
+            old_shift = None
+            if entry.shift_id:
+                old = db.query(Shift).filter_by(id=entry.shift_id).first()
+                old_shift = old.shift_code if old else None
+
             entry.shift_id = shift.id
+
+            # audit log
+            db.execute(text("""
+                INSERT INTO audit_logs (employee_id, date, old_shift, new_shift, changed_by)
+                VALUES (:emp, :date, :old, :new, :user)
+            """), {
+                "emp": employee_id,
+                "date": current,
+                "old": old_shift,
+                "new": shift_code,
+                "user": user.get("sub")
+            })
+
             updated_count += 1
 
         current += timedelta(days=1)
@@ -443,7 +483,8 @@ def export_roster(month: int, year: int, db: Session = Depends(get_db)):
             result[emp_id] = {
                 "name": emp.name,
                 "team": emp.team,
-                "shifts": {}
+                "shifts": {},
+                "comments": {}
             }
 
         shift_code = None
@@ -452,6 +493,7 @@ def export_roster(month: int, year: int, db: Session = Depends(get_db)):
             shift_code = shift.shift_code
 
         result[emp_id]["shifts"][str(entry.date)] = shift_code
+        result[emp_id]["comments"][str(entry.date)] = entry.comment
 
     employees = list(result.values())
     dates = sorted(next(iter(result.values()))["shifts"].keys())
@@ -711,3 +753,40 @@ def delete_admin(
     db.commit()
 
     return {"message": "Admin removed"}
+
+@router.put("/roster-entry/comment")
+def add_comment(
+    employee_id: int,
+    date: str,
+    comment: str,
+    db: Session = Depends(get_db),
+    user=Depends(verify_token)
+):
+    from datetime import datetime
+
+    roster_date = datetime.strptime(date, "%Y-%m-%d").date()
+
+    entry = db.query(RosterEntry).filter_by(
+        employee_id=employee_id,
+        date=roster_date
+    ).first()
+
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+
+    entry.comment = comment
+
+    db.execute(text("""
+        INSERT INTO audit_logs (employee_id, date, old_shift, new_shift, changed_by)
+        VALUES (:emp, :date, :old, :new, :user)
+    """), {
+        "emp": employee_id,
+        "date": roster_date,
+        "old": "COMMENT",
+        "new": comment,
+        "user": user.get("sub")
+    })
+
+    db.commit()
+
+    return {"message": "Comment added"}
