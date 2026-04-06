@@ -21,6 +21,8 @@ from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from passlib.context import CryptContext
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy import text
+from collections import defaultdict
+from openpyxl.comments import Comment
 
 router = APIRouter()
 
@@ -193,7 +195,6 @@ def update_roster_entry(
     user=Depends(verify_token)
 ):
     from app.models.shift import Shift
-    from datetime import datetime
 
     # Convert date string to date object
     roster_date = datetime.strptime(date, "%Y-%m-%d").date()
@@ -248,7 +249,6 @@ def bulk_update_roster(
     user=Depends(verify_token)
 ):
     from app.models.shift import Shift
-    from datetime import datetime, timedelta
 
     start = datetime.strptime(start_date, "%Y-%m-%d").date()
     end = datetime.strptime(end_date, "%Y-%m-%d").date()
@@ -307,7 +307,6 @@ def copy_week(
     target_start_date: str,
     db: Session = Depends(get_db)
 ):
-    from datetime import datetime, timedelta
 
     source_start = datetime.strptime(source_start_date, "%Y-%m-%d").date()
     target_start = datetime.strptime(target_start_date, "%Y-%m-%d").date()
@@ -335,7 +334,6 @@ def copy_week(
 
 @router.get("/roster/summary")
 def roster_summary(date: str, db: Session = Depends(get_db)):
-    from datetime import datetime
     from app.models.shift import Shift
 
     target_date = datetime.strptime(date, "%Y-%m-%d").date()
@@ -493,7 +491,7 @@ def export_roster(month: int, year: int, db: Session = Depends(get_db)):
             shift_code = shift.shift_code
 
         result[emp_id]["shifts"][str(entry.date)] = shift_code
-        result[emp_id]["comments"][str(entry.date)] = entry.comment
+        result[emp_id]["comments"][str(entry.date)] = entry.comment or ""  # ✅ SAFE
 
     employees = list(result.values())
     dates = sorted(next(iter(result.values()))["shifts"].keys())
@@ -517,14 +515,10 @@ def export_roster(month: int, year: int, db: Session = Depends(get_db)):
         "LV": "FFB6C1", "GH": "FFFFE0", "CO": "E0FFFF"
     }
 
-    from datetime import datetime
-    from collections import defaultdict
-
     # =========================
     # HEADER
     # =========================
     headers = ["Employee"]
-
     weekend_cols = []
 
     for idx, d in enumerate(dates):
@@ -532,14 +526,13 @@ def export_roster(month: int, year: int, db: Session = Depends(get_db)):
         headers.append(f"{dt.strftime('%a')}\n{dt.day}")
 
         if dt.weekday() >= 5:
-            weekend_cols.append(idx + 2)  # excel col index
+            weekend_cols.append(idx + 2)
 
-    headers += [""]  # spacer
+    headers += [""]
     headers += ["S1","S2","S3","G","WO","CO","GH","LV"]
 
     ws.append(headers)
 
-    # style header
     for col_idx, cell in enumerate(ws[1], start=1):
         cell.font = header_font
         cell.alignment = center_align
@@ -559,7 +552,6 @@ def export_roster(month: int, year: int, db: Session = Depends(get_db)):
 
     for team, emps in grouped.items():
 
-        # Team header
         ws.cell(row=current_row, column=1, value=team).font = Font(bold=True)
         current_row += 1
 
@@ -569,7 +561,6 @@ def export_roster(month: int, year: int, db: Session = Depends(get_db)):
         for emp in emps:
 
             counts = {k:0 for k in ["S1","S2","S3","G","WO","CO","GH","LV"]}
-
             row = [emp["name"]]
 
             for d in dates:
@@ -579,7 +570,7 @@ def export_roster(month: int, year: int, db: Session = Depends(get_db)):
                 if shift in counts:
                     counts[shift] += 1
 
-            row += [""]  # spacer
+            row += [""]
             row += list(counts.values())
 
             ws.append(row)
@@ -589,21 +580,30 @@ def export_roster(month: int, year: int, db: Session = Depends(get_db)):
                 cell.alignment = center_align
                 cell.border = thin_border
 
-                # Shift cells
+                # =========================
+                # SHIFT CELLS
+                # =========================
                 if 1 < col_idx <= len(dates)+1:
                     val = cell.value
+                    current_date = dates[col_idx-2]
+                    dt = datetime.strptime(current_date, "%Y-%m-%d")
 
-                    dt = datetime.strptime(dates[col_idx-2], "%Y-%m-%d")
+                    # ✅ ADD COMMENT
+                    comment_text = emp["comments"].get(current_date)
+                    if comment_text:
+                        cell.comment = Comment(comment_text, "Admin")
 
-                    # Weekend blank highlight
+                    # Weekend blank
                     if dt.weekday() >= 5 and val == "-":
                         cell.fill = PatternFill(start_color="FFF5F5", end_color="FFF5F5", fill_type="solid")
 
-                    # Shift color
+                    # Shift colors
                     elif val in colors:
                         cell.fill = PatternFill(start_color=colors[val], end_color=colors[val], fill_type="solid")
 
-                # Summary cells
+                # =========================
+                # SUMMARY CELLS
+                # =========================
                 if col_idx > len(dates)+2:
                     val = cell.value
 
@@ -617,20 +617,14 @@ def export_roster(month: int, year: int, db: Session = Depends(get_db)):
             current_row += 1
 
         # =========================
-        # SPACER ROW
+        # SPACER + SUMMARY
         # =========================
         ws.append([""] * len(headers))
         current_row += 1
 
-        # =========================
-        # SHIFT SUMMARY TITLE
-        # =========================
         ws.append(["Shift Summary"] + [""]*(len(headers)-1))
         current_row += 1
 
-        # =========================
-        # PIVOT (COLUMN SUMMARY)
-        # =========================
         pivot = {
             "S1":{}, "S2":{}, "S3":{}, "G":{},
             "WO":{}, "CO":{}, "GH":{}, "LV":{}
@@ -649,12 +643,10 @@ def export_roster(month: int, year: int, db: Session = Depends(get_db)):
         for shift, values in pivot.items():
 
             row = [shift]
-
             for d in dates:
                 row.append(values[d])
 
-            row += [""] * 9  # spacer + summary
-
+            row += [""] * 9
             ws.append(row)
 
             for col_idx, cell in enumerate(ws[current_row], start=1):
@@ -674,7 +666,7 @@ def export_roster(month: int, year: int, db: Session = Depends(get_db)):
 
             current_row += 1
 
-        current_row += 2  # space between teams
+        current_row += 2
 
     # =========================
     # AUTO WIDTH
@@ -689,10 +681,11 @@ def export_roster(month: int, year: int, db: Session = Depends(get_db)):
 
         ws.column_dimensions[col_letter].width = max_length + 2
 
-    # Freeze header
     ws.freeze_panes = "B2"
 
-    # Save
+    # =========================
+    # SAVE
+    # =========================
     file_stream = BytesIO()
     wb.save(file_stream)
     file_stream.seek(0)
@@ -762,7 +755,6 @@ def add_comment(
     db: Session = Depends(get_db),
     user=Depends(verify_token)
 ):
-    from datetime import datetime
 
     roster_date = datetime.strptime(date, "%Y-%m-%d").date()
 
