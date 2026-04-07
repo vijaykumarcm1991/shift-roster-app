@@ -48,6 +48,7 @@ async function login() {
 
     document.getElementById("loginBox").style.display = "none";
 
+    applyRoleUI();
     loadRoster();
 
 }
@@ -58,6 +59,11 @@ async function loadRoster() {
     }
     const month = document.getElementById("monthSelect").value;
     const year = document.getElementById("yearSelect").value;
+
+    if (!month || !year) {
+        console.warn("Month/Year missing");
+        return;
+    }
 
     const res = await fetch(`/roster?month=${month}&year=${year}`);
     const data = await res.json();
@@ -790,6 +796,12 @@ function redoLastChange() {
 }
 
 function reloadRoster() {
+
+    const today = new Date();
+
+    document.getElementById("monthSelect").value = today.getMonth() + 1;
+    document.getElementById("yearSelect").value = today.getFullYear();
+
     loadRoster();
 }
 
@@ -799,6 +811,7 @@ function logout() {
 
     alert("Logged out");
 
+    applyRoleUI();
     loadRoster(); // reload UI
 }
 
@@ -1086,6 +1099,24 @@ document.addEventListener("keydown", function (e) {
     }
 });
 
+function toggleSidebar() {
+
+    const sidebar = document.querySelector(".sidebar");
+    const main = document.querySelector(".main");
+
+    sidebar.classList.toggle("collapsed");
+    main.classList.toggle("expanded");
+}
+
+function setActive(btn) {
+
+    document.querySelectorAll(".sidebar button").forEach(b => {
+        b.classList.remove("active");
+    });
+
+    btn.classList.add("active");
+}
+
 document.addEventListener("DOMContentLoaded", function () {
 
     const today = new Date();
@@ -1101,7 +1132,9 @@ document.addEventListener("DOMContentLoaded", function () {
     panel.style.transform = "translateX(100%)";
 
     applyRoleUI();
-    loadRoster();
+    if (document.getElementById("rosterTable")) {
+        loadRoster();
+    }
 });
 
 // ✅ ADD THIS BELOW

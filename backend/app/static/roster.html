@@ -11,26 +11,50 @@
     <!-- 🔥 SIDEBAR -->
     <div class="sidebar">
 
+        <button id="toggleSidebarBtn" onclick="toggleSidebar()" style="margin-bottom:10px;">☰</button>
+
         <h3>📊 NOC Panel</h3>
 
-        <button onclick="reloadRoster()">📅 Roster</button>
-        <button onclick="exportRoster()">📊 Export</button>
-        <button onclick="toggleAudit()">📜 Audit</button>
+        <button onclick="setActive(this); reloadRoster()" title="Roster">
+            📅 <span>Roster</span>
+        </button>
+
+        <button onclick="setActive(this); exportRoster()" title="Export">
+            📊 <span>Export</span>
+        </button>
+
+        <button onclick="setActive(this); toggleAudit()" title="Audit Logs">
+            📜 <span>Audit</span>
+        </button>
 
         <hr>
 
         <div id="adminSection">
             <h4>Admin</h4>
-            <button onclick="createRoster()">Create Roster</button>
-            <button onclick="showAddEmployee()">Add Employee</button>
-            <button onclick="deleteEmployee()">Remove Employee</button>
-            <button onclick="showAddAdmin()">Add Admin</button>
-            <button onclick="deleteAdmin()">Remove Admin</button>
+            <button onclick="setActive(this); createRoster()" title="Create Roster">
+                🆕 <span>Create Roster</span>
+            </button>
+
+            <button onclick="setActive(this); showAddEmployee()" title="Add Employee">
+                ➕ <span>Add Employee</span>
+            </button>
+
+            <button onclick="setActive(this); deleteEmployee()" title="Remove Employee">
+                ❌ <span>Remove Employee</span>
+            </button>
+
+            <button onclick="setActive(this); showAddAdmin()" title="Add Admin">
+                👤➕ <span>Add Admin</span>
+            </button>
+
+            <button onclick="setActive(this); deleteAdmin()" title="Remove Admin">
+                👤❌ <span>Remove Admin</span>
+            </button>
         </div>
 
         <hr>
 
-        <button onclick="logout()">🚪 Logout</button>
+        <button onclick="setActive(this); logout()">🚪 Logout</button>
 
     </div>
 
