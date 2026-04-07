@@ -491,61 +491,51 @@ def export_roster(month: int, year: int, db: Session = Depends(get_db)):
             shift_code = shift.shift_code
 
         result[emp_id]["shifts"][str(entry.date)] = shift_code
-        result[emp_id]["comments"][str(entry.date)] = entry.comment or ""  # ✅ SAFE
+        result[emp_id]["comments"][str(entry.date)] = entry.comment or ""
 
     employees = list(result.values())
+
+    if not employees:
+        raise HTTPException(status_code=404, detail="No data found")
+
     dates = sorted(next(iter(result.values()))["shifts"].keys())
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Roster"
 
-    # Styles
+    # ================= STYLES =================
     header_font = Font(bold=True)
-    center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    thin_border = Border(
-        left=Side(style='thin'), right=Side(style='thin'),
-        top=Side(style='thin'), bottom=Side(style='thin')
-    )
+    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    border = Border(left=Side(style='thin'), right=Side(style='thin'),
+                    top=Side(style='thin'), bottom=Side(style='thin'))
 
-    # Colors
     colors = {
         "S1": "ADD8E6", "S2": "FFDAB9", "S3": "DDA0DD",
         "G": "90EE90", "WO": "D3D3D3",
         "LV": "FFB6C1", "GH": "FFFFE0", "CO": "E0FFFF"
     }
 
-    # =========================
-    # HEADER
-    # =========================
+    # ================= HEADER =================
     headers = ["Employee"]
-    weekend_cols = []
 
-    for idx, d in enumerate(dates):
+    for d in dates:
         dt = datetime.strptime(d, "%Y-%m-%d")
         headers.append(f"{dt.strftime('%a')}\n{dt.day}")
 
-        if dt.weekday() >= 5:
-            weekend_cols.append(idx + 2)
-
     headers += [""]
-    headers += ["S1","S2","S3","G","WO","CO","GH","LV"]
+    headers += ["S1","S2","S3","G","WO","CO","GH","LV","WD"]
 
     ws.append(headers)
 
-    for col_idx, cell in enumerate(ws[1], start=1):
+    for cell in ws[1]:
         cell.font = header_font
-        cell.alignment = center_align
-        cell.border = thin_border
-
-        if col_idx in weekend_cols:
-            cell.fill = PatternFill(start_color="FFECEC", end_color="FFECEC", fill_type="solid")
+        cell.alignment = center
+        cell.border = border
 
     current_row = 2
 
-    # =========================
-    # GROUP BY TEAM
-    # =========================
+    # ================= GROUP =================
     grouped = defaultdict(list)
     for emp in employees:
         grouped[emp["team"]].append(emp)
@@ -555,9 +545,7 @@ def export_roster(month: int, year: int, db: Session = Depends(get_db)):
         ws.cell(row=current_row, column=1, value=team).font = Font(bold=True)
         current_row += 1
 
-        # =========================
-        # EMPLOYEE ROWS
-        # =========================
+        # ================= EMPLOYEE ROWS =================
         for emp in emps:
 
             counts = {k:0 for k in ["S1","S2","S3","G","WO","CO","GH","LV"]}
@@ -570,59 +558,51 @@ def export_roster(month: int, year: int, db: Session = Depends(get_db)):
                 if shift in counts:
                     counts[shift] += 1
 
+            working_days = counts["S1"] + counts["S2"] + counts["S3"] + counts["G"]
+
             row += [""]
-            row += list(counts.values())
+            row += [
+                counts["S1"], counts["S2"], counts["S3"], counts["G"],
+                counts["WO"], counts["CO"], counts["GH"], counts["LV"],
+                working_days
+            ]
 
             ws.append(row)
 
             for col_idx, cell in enumerate(ws[current_row], start=1):
 
-                cell.alignment = center_align
-                cell.border = thin_border
+                cell.alignment = center
+                cell.border = border
 
-                # =========================
-                # SHIFT CELLS
-                # =========================
                 if 1 < col_idx <= len(dates)+1:
                     val = cell.value
                     current_date = dates[col_idx-2]
-                    dt = datetime.strptime(current_date, "%Y-%m-%d")
 
-                    # ✅ ADD COMMENT
-                    comment_text = emp["comments"].get(current_date)
-                    if comment_text:
-                        cell.comment = Comment(comment_text, "Admin")
+                    comment = emp["comments"].get(current_date)
+                    if comment:
+                        cell.comment = Comment(comment, "System")
 
-                    # Weekend blank
-                    if dt.weekday() >= 5 and val == "-":
-                        cell.fill = PatternFill(start_color="FFF5F5", end_color="FFF5F5", fill_type="solid")
-
-                    # Shift colors
-                    elif val in colors:
+                    if val in colors:
                         cell.fill = PatternFill(start_color=colors[val], end_color=colors[val], fill_type="solid")
 
-                # =========================
-                # SUMMARY CELLS
-                # =========================
-                if col_idx > len(dates)+2:
-                    val = cell.value
-
-                    if val > 2:
-                        cell.fill = PatternFill(start_color="28A745", end_color="28A745", fill_type="solid")
-                        cell.font = Font(color="FFFFFF", bold=True)
-                    elif val < 2:
-                        cell.fill = PatternFill(start_color="DC3545", end_color="DC3545", fill_type="solid")
-                        cell.font = Font(color="FFFFFF", bold=True)
+                summary_start = len(dates) + 3
+                if col_idx >= summary_start:
+                    if isinstance(cell.value, int):
+                        if cell.value > 2:
+                            cell.fill = PatternFill(start_color="28A745", end_color="28A745", fill_type="solid")
+                            cell.font = Font(color="FFFFFF", bold=True)
+                        elif cell.value < 2:
+                            cell.fill = PatternFill(start_color="DC3545", end_color="DC3545", fill_type="solid")
+                            cell.font = Font(color="FFFFFF", bold=True)
 
             current_row += 1
 
-        # =========================
-        # SPACER + SUMMARY
-        # =========================
-        ws.append([""] * len(headers))
+        # ================= SPACER =================
+        ws.append([""])
         current_row += 1
 
-        ws.append(["Shift Summary"] + [""]*(len(headers)-1))
+        # ================= SHIFT SUMMARY =================
+        ws.append(["Shift Summary"])
         current_row += 1
 
         pivot = {
@@ -640,58 +620,61 @@ def export_roster(month: int, year: int, db: Session = Depends(get_db)):
                 if shift in pivot:
                     pivot[shift][d] += 1
 
-        for shift, values in pivot.items():
+        for shift in ["S1","S2","S3","G","WO","CO","GH","LV"]:
 
             row = [shift]
-            for d in dates:
-                row.append(values[d])
 
+            for d in dates:
+                row.append(pivot[shift][d])
+
+            row += [""]
             row += [""] * 9
+
             ws.append(row)
 
             for col_idx, cell in enumerate(ws[current_row], start=1):
+                cell.alignment = center
+                cell.border = border
 
-                cell.alignment = center_align
-                cell.border = thin_border
-
-                if 1 < col_idx <= len(dates)+1:
-                    val = cell.value
-
-                    if val > 2:
+                if isinstance(cell.value, int):
+                    if cell.value > 2:
                         cell.fill = PatternFill(start_color="28A745", end_color="28A745", fill_type="solid")
                         cell.font = Font(color="FFFFFF", bold=True)
-                    elif val < 2:
+                    elif cell.value < 2:
                         cell.fill = PatternFill(start_color="DC3545", end_color="DC3545", fill_type="solid")
                         cell.font = Font(color="FFFFFF", bold=True)
 
             current_row += 1
 
+        # ================= GRAND TOTAL (FIXED) =================
+        ws.append(
+            ["Grand Total"] +
+            [
+                sum(
+                    1 for emp in emps
+                    if emp["shifts"][d] in ["S1","S2","S3","G"]
+                )
+                for d in dates
+            ] +
+            [""] +
+            [""] * 9   # ✅ FIX: no row summary totals
+        )
+
         current_row += 2
 
-    # =========================
-    # AUTO WIDTH
-    # =========================
+    # ================= AUTO WIDTH =================
     for col in ws.columns:
-        max_length = 0
-        col_letter = col[0].column_letter
-
-        for cell in col:
-            if cell.value:
-                max_length = max(max_length, len(str(cell.value)))
-
-        ws.column_dimensions[col_letter].width = max_length + 2
+        max_len = max(len(str(cell.value)) if cell.value else 0 for cell in col)
+        ws.column_dimensions[col[0].column_letter].width = max_len + 2
 
     ws.freeze_panes = "B2"
 
-    # =========================
-    # SAVE
-    # =========================
-    file_stream = BytesIO()
-    wb.save(file_stream)
-    file_stream.seek(0)
+    stream = BytesIO()
+    wb.save(stream)
+    stream.seek(0)
 
     return StreamingResponse(
-        file_stream,
+        stream,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename=roster_{month}_{year}.xlsx"}
     )

@@ -115,6 +115,39 @@
             z-index: 100;
         }
 
+        th:first-child, td:first-child {
+            min-width: 180px;
+            max-width: 220px;
+            width: 200px;
+        }
+
+        th, td {
+            white-space: nowrap;
+        }
+
+        /* Date columns ONLY (exclude employee + spacer + summary) */
+        th:nth-child(n+2):nth-last-child(n+10),
+        td:nth-child(n+2):nth-last-child(n+10) {
+            min-width: 70px;
+            text-align: center;
+        }
+
+        /* Summary columns (S1–WD) */
+        th:nth-last-child(-n+9),
+        td:nth-last-child(-n+9) {
+            min-width: 45px;
+            max-width: 55px;
+            font-weight: bold;
+        }
+
+        table {
+            table-layout: auto;
+        }
+
+        #rosterTable {
+            overflow-x: auto;
+        }
+
     </style>
 </head>
 <body>
@@ -290,15 +323,17 @@ async function loadRoster() {
             const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
 
             html += `<th style="${isWeekend ? 'background:#ffecec;' : ''}">
-                <div>${day}</div>
-                <div>${dateNum}</div>
+                <div style="line-height:1.2;">
+                    <div style="font-size:11px;">${day}</div>
+                    <div style="font-size:13px; font-weight:bold;">${dateNum}</div>
+                </div>
             </th>`;
         });
         // 👉 spacer column
         html += `<th style="width:6px; background:#e5e7eb;"></th>`;
 
         // 👉 summary headers
-        html += `<th>S1</th><th>S2</th><th>S3</th><th>G</th><th>WO</th><th>CO</th><th>GH</th><th>LV</th>`;
+        html += `<th>S1</th><th>S2</th><th>S3</th><th>G</th><th>WO</th><th>CO</th><th>GH</th><th>LV</th><th>WD</th>`;
         html += "</tr>";
 
         groups[team].forEach(emp => {
@@ -355,28 +390,53 @@ async function loadRoster() {
 
             // 👉 spacer cell
             html += `<td style="background:#e5e7eb;"></td>`;
+
+            const workingDays = counts.S1 + counts.S2 + counts.S3 + counts.G;
             // 👉 ADD RIGHT SIDE SUMMARY
-            html += `
-                <td>${counts.S1}</td>
-                <td>${counts.S2}</td>
-                <td>${counts.S3}</td>
-                <td>${counts.G}</td>
-                <td>${counts.WO}</td>
-                <td>${counts.CO}</td>
-                <td>${counts.GH}</td>
-                <td>${counts.LV}</td>
-            `;
+            html += "<td>"+counts.S1+"</td>" +
+                    "<td>"+counts.S2+"</td>" +
+                    "<td>"+counts.S3+"</td>" +
+                    "<td>"+counts.G+"</td>" +
+                    "<td>"+counts.WO+"</td>" +
+                    "<td>"+counts.CO+"</td>" +
+                    "<td>"+counts.GH+"</td>" +
+                    "<td>"+counts.LV+"</td>" +
+                    "<td><b>"+workingDays+"</b></td>";
 
             html += "</tr>";
         });
 
-        html += `<tr><td colspan="${dates.length + 10}" style="height:2px; background:transparent;"></td></tr>`;
+        // html += `<tr style="height:2px;"></tr>`;
 
-        html += `<tr style="background:#eef2ff; font-weight:bold;">
-            <td colspan="${dates.length + 10}" style="text-align:center;">
-                Shift Summary
-            </td>
+        // html += `<tr style="background:#eef2ff; font-weight:bold;">
+        //     <td colspan="${dates.length + 10}" style="text-align:center;">
+        //         Shift Summary
+        //     </td>
+        // </tr>`;
+
+        html += `<tr style="background:#eef2ff; font-weight:bold;">`;
+
+        html += `<tr>
+            <td colspan="${dates.length + 11}" style="height:8px; background:#f5f7fb;"></td>
         </tr>`;
+
+        // Employee column
+        html += `<td><b>Shift Summary</b></td>`;
+
+        // date columns
+        for (let i = 0; i < dates.length; i++) {
+            html += `<td></td>`;
+        }
+
+        // spacer
+        html += `<td style="background:#e5e7eb;"></td>`;
+
+        // summary columns (9)
+        for (let i = 0; i < 9; i++) {
+            html += `<td></td>`;
+        }
+
+        html += `</tr>`;
 
         // 👉 Pivot summary (Shift vs Date)
         let pivot = {
@@ -406,7 +466,7 @@ async function loadRoster() {
         Object.keys(pivot).forEach(shift => {
 
             html += `<tr style="background:#e8f0fe; font-weight:bold;">
-                <td style="position:sticky; left:0; background:#e8f0fe;">
+                <td style="background:#e8f0fe;">
                     <b>${shift}</b>
                 </td>`;
 
@@ -429,10 +489,36 @@ async function loadRoster() {
             html += `<td style="background:#e5e7eb;"></td>`;
 
             // remaining empty summary columns
-            html += `<td colspan="8"></td>`;
+            for (let i = 0; i < 9; i++) {
+                html += `<td></td>`;
+            }
 
             html += `</tr>`;
         });
+
+        // 👉 TOTAL RESOURCES ROW
+        html += `<tr style="background:#d1fae5; font-weight:bold;">
+            <td><b>Total</b></td>`;
+
+        dates.forEach(d => {
+            const total =
+                pivot.S1[d] +
+                pivot.S2[d] +
+                pivot.S3[d] +
+                pivot.G[d];
+
+            html += `<td style="background:#059669; color:white;">${total}</td>`;
+        });
+
+        // divider column
+        html += `<td style="background:#e5e7eb;"></td>`;
+
+        // remaining summary columns
+        for (let i = 0; i < 9; i++) {
+            html += `<td></td>`;
+        }
+
+        html += `</tr>`;
 
         html += "</table><br>";
     }
@@ -486,7 +572,7 @@ async function loadRoster() {
                 // restore comment style
                 if (existingComment) {
                     item.cell.title = existingComment;
-                    item.cell.style.outline = "2px solid orange";
+                    item.cell.classList.add("comment-cell");
                 }
                 // 🔥 ADD THIS
                 updateRowSummary(item.empId, oldValue, shift);
@@ -754,13 +840,19 @@ function applyColor(cell, shift) {
 
 function updateRowSummary(empId, oldShift, newShift) {
 
-    const row = document.querySelector(`[data-emp="${empId}"]`).parentElement;
+    const cell = document.querySelector(`[data-emp="${empId}"][data-date]`);
+    if (!cell) return;
+
+    const row = cell.closest("tr");
 
     const summaryCells = row.querySelectorAll("td");
     const totalCols = summaryCells.length;
 
-    // last 8 columns = summary
-    const summaryStart = totalCols - 8;
+    // last 9 columns = summary (added WD)
+    const summaryStart = totalCols - 9;
+
+    // ❗ ADD THIS SAFETY FIX
+    if (summaryStart < 0) return;
 
     const shiftIndex = {
         S1:0, S2:1, S3:2, G:3, WO:4, CO:5, GH:6, LV:7
@@ -769,7 +861,7 @@ function updateRowSummary(empId, oldShift, newShift) {
     // decrease old
     if (shiftIndex[oldShift] !== undefined) {
         let cell = summaryCells[summaryStart + shiftIndex[oldShift]];
-        cell.innerText = parseInt(cell.innerText) - 1;
+        cell.innerText = Math.max(0, (parseInt(cell.innerText) || 0) - 1);
     }
 
     // increase new
@@ -777,6 +869,16 @@ function updateRowSummary(empId, oldShift, newShift) {
         let cell = summaryCells[summaryStart + shiftIndex[newShift]];
         cell.innerText = parseInt(cell.innerText) + 1;
     }
+
+    // ✅ NOW calculate WD (CORRECT)
+    const wdCell = summaryCells[summaryStart + 8];
+
+    const s1 = parseInt(summaryCells[summaryStart + 0].innerText);
+    const s2 = parseInt(summaryCells[summaryStart + 1].innerText);
+    const s3 = parseInt(summaryCells[summaryStart + 2].innerText);
+    const g  = parseInt(summaryCells[summaryStart + 3].innerText);
+
+    wdCell.innerText = s1 + s2 + s3 + g;
 }
 
 function updatePivot(date, oldShift, newShift) {
@@ -808,6 +910,40 @@ function updatePivot(date, oldShift, newShift) {
             cells[colIndex].innerText = val + 1;
         }
     });
+
+    // 👉 update TOTAL row
+    const totalRow = Array.from(document.querySelectorAll("tr")).find(row => {
+        const firstCell = row.querySelector("td");
+        return firstCell && firstCell.innerText.trim() === "Total";
+    });
+
+    if (totalRow) {
+        const cells = totalRow.querySelectorAll("td");
+        let colIndex = datesGlobal.indexOf(date) + 1;
+
+        if (colIndex > 0) {
+
+            const s1 = getPivotValue("S1", colIndex);
+            const s2 = getPivotValue("S2", colIndex);
+            const s3 = getPivotValue("S3", colIndex);
+            const g  = getPivotValue("G", colIndex);
+
+            cells[colIndex].innerText = s1 + s2 + s3 + g;
+        }
+    }
+
+    // helper
+    function getPivotValue(shift, colIndex) {
+        const row = Array.from(document.querySelectorAll("tr")).find(r => {
+            const cell = r.querySelector("td");
+            return cell && cell.innerText.trim() === shift;
+        });
+
+        if (!row) return 0;
+
+        const val = parseInt(row.querySelectorAll("td")[colIndex].innerText);
+        return isNaN(val) ? 0 : val;
+    }
 }
 
 function undoLastChange() {
