@@ -171,3 +171,66 @@ table {
     align-items: center;
     gap: 5px;
 }
+
+/* 🔥 LAYOUT */
+.layout {
+    display: flex;
+}
+
+/* 🔥 SIDEBAR */
+.sidebar {
+    width: 220px;
+    background: #f1f5f9; /* match page */
+    color: #1e293b;
+    height: 100vh;
+    padding: 15px;
+    position: fixed;
+    border-right: 1px solid #e2e8f0;
+}
+
+.sidebar h3 {
+    font-size: 18px;
+    margin-bottom: 20px;
+}
+
+.sidebar h4 {
+    margin-top: 10px;
+    font-size: 14px;
+    color: #64748b;
+}
+
+.sidebar button {
+    background: white;
+    color: #1e293b;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 10px;
+    text-align: left;
+}
+
+.sidebar button:hover {
+    background: #e2e8f0;
+}
+
+.sidebar hr {
+    border: 0;
+    border-top: 1px solid #475569;
+    margin: 15px 0;
+}
+
+/* 🔥 MAIN AREA */
+.main {
+    margin-left: 240px;
+    padding: 20px;
+    width: calc(100% - 240px);
+}
+
+/* 🔥 TOP BAR */
+.topbar {
+    margin-bottom: 15px;
+}
+
+/* 🔥 ACTION BAR */
+.action-bar {
+    margin-bottom: 10px;
+}

@@ -367,7 +367,7 @@ async function loadRoster() {
     const createBtn = document.querySelector("button[onclick='createRoster()']");
     const addBtn = document.querySelector("button[onclick='showAddEmployee()']");
     const delBtn = document.querySelector("button[onclick='deleteEmployee()']");
-    const adminMenu = document.querySelector(".admin-menu");
+    const adminSection = document.getElementById("adminSection");
 
     if (!token) {
         document.getElementById("undoBtn").style.display = "none";
@@ -379,7 +379,7 @@ async function loadRoster() {
         if (createBtn) createBtn.style.display = "none";
         if (addBtn) addBtn.style.display = "none";
         if (delBtn) delBtn.style.display = "none";
-        if (adminMenu) adminMenu.style.display = "none";
+        if (adminSection) adminSection.style.display = "none";
 
     } else {
         document.getElementById("undoBtn").style.display = "inline-block";
@@ -391,7 +391,7 @@ async function loadRoster() {
         if (createBtn) createBtn.style.display = "inline-block";
         if (addBtn) addBtn.style.display = "inline-block";
         if (delBtn) delBtn.style.display = "inline-block";
-        if (adminMenu) adminMenu.style.display = "inline-block";
+        if (adminSection) adminSection.style.display = "block";
 }
     attachEvents(); // ✅ IMPORTANT
 }
@@ -1007,18 +1007,18 @@ async function deleteAdmin() {
 function applyRoleUI() {
     const token = localStorage.getItem("token");
 
-    const adminMenu = document.querySelector(".admin-menu");
+    const adminSection = document.getElementById("adminSection");
     const createBtn = document.querySelector("button[onclick='createRoster()']");
     const addBtn = document.querySelector("button[onclick='showAddEmployee()']");
     const delBtn = document.querySelector("button[onclick='deleteEmployee()']");
 
     if (!token) {
-        if (adminMenu) adminMenu.style.display = "none";
+        if (adminSection) adminSection.style.display = "none";
         if (createBtn) createBtn.style.display = "none";
         if (addBtn) addBtn.style.display = "none";
         if (delBtn) delBtn.style.display = "none";
     } else {
-        if (adminMenu) adminMenu.style.display = "inline-block";
+        if (adminSection) adminSection.style.display = "block";
         if (createBtn) createBtn.style.display = "inline-block";
         if (addBtn) addBtn.style.display = "inline-block";
         if (delBtn) delBtn.style.display = "inline-block";
