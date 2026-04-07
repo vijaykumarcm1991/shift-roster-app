@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Reports</title>
+
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100">
+
+<div>
+
+    <!-- SIDEBAR -->
+    <div class="w-60 bg-white shadow-md h-screen p-4 fixed">
+
+        <h2 class="text-xl font-bold mb-6 text-indigo-600">📊 NOC Panel</h2>
+
+        <div class="space-y-2">
+            <button id="navRoster" onclick="location.href='roster.html'" class="w-full text-left px-3 py-2 rounded hover:bg-gray-200">📅 Roster</button>
+
+            <button id="navReports" onclick="location.href='reports.html'" class="w-full text-left px-3 py-2 rounded hover:bg-gray-200">📊 Reports</button>
+
+            <button id="navEmployees" onclick="location.href='employees.html'" class="w-full text-left px-3 py-2 rounded hover:bg-gray-200">👥 Employees</button>
+
+            <button id="navAdmin" onclick="location.href='admin.html'" class="w-full text-left px-3 py-2 rounded hover:bg-gray-200">🛠 Admin</button>
+        </div>
+
+        <hr class="my-4">
+
+        <!-- 🔥 USER -->
+        <div id="userLabel" class="text-sm text-gray-600 mb-2 hidden"></div>
+
+        <button id="loginBtn" onclick="location.href='login.html'"
+            class="w-full text-left px-3 py-2 rounded hover:bg-gray-200">
+            🔐 Login
+        </button>
+
+        <button id="logoutBtn" onclick="logout()"
+            class="w-full text-left px-3 py-2 rounded hover:bg-gray-200 hidden">
+            🚪 Logout
+        </button>
+
+    </div>
+
+    <!-- MAIN -->
+    <div class="ml-64 p-6">
+
+        <h2 class="text-2xl font-bold mb-6">Reports & Export</h2>
+
+        <!-- EXPORT BOX -->
+        <div class="bg-white p-4 rounded shadow mb-6 flex gap-3 items-center">
+
+            <select id="monthSelect" class="border p-2 rounded"></select>
+
+            <select id="yearSelect" class="border p-2 rounded">
+                <script>
+                    const year = new Date().getFullYear();
+                    for (let i = year - 2; i <= year + 2; i++) {
+                        document.write(`<option value="${i}">${i}</option>`);
+                    }
+                </script>
+            </select>
+
+            <button onclick="exportRoster()"
+                class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                Export Excel
+            </button>
+
+            <button onclick="toggleAudit()"
+                class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                View Audit Logs
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- 🔥 AUDIT SIDEBAR -->
+<div id="auditOverlay"
+    class="fixed inset-0 bg-black bg-opacity-30 hidden z-40"
+    onclick="toggleAudit()"></div>
+
+<div id="auditPanel"
+    class="fixed top-0 right-0 w-96 h-full bg-white shadow-lg transform translate-x-full transition-transform duration-300 z-50 flex flex-col">
+
+    <!-- HEADER -->
+    <div class="p-4 border-b flex justify-between items-center">
+        <h3 class="text-lg font-bold">Audit Logs</h3>
+        <button onclick="toggleAudit()">✖</button>
+    </div>
+
+    <!-- CONTENT -->
+    <div id="auditContent" class="p-4 overflow-y-auto flex-1"></div>
+
+</div>
+
+<script src="/static/js/app.js"></script>
+<script>
+    initSidebar("reports");
+</script>
+</body>
+</html>

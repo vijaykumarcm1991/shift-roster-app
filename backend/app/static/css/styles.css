@@ -247,27 +247,25 @@ table {
     width: 70px;
 }
 
-.sidebar.collapsed h3,
-.sidebar.collapsed h4,
-.sidebar.collapsed span {
-    display: none;
-}
-
-/* show only icons */
 .sidebar.collapsed button {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    margin: 10px auto;
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 12px;
 }
 
-/* prevent empty look */
+/* hide everything except emoji */
 .sidebar.collapsed button span {
     display: none;
 }
 
-.sidebar.collapsed button::before {
-    font-size: 16px;
+.sidebar.collapsed h3,
+.sidebar.collapsed h4,
+.sidebar.collapsed hr {
+    display: none;
 }
 
 /* MAIN EXPAND */
@@ -298,7 +296,6 @@ table {
     position: relative;
 }
 
-/* tooltip */
 .sidebar button:hover::after {
     content: attr(title);
     position: absolute;
@@ -309,7 +306,7 @@ table {
     border-radius: 4px;
     white-space: nowrap;
     font-size: 12px;
-    opacity: 1;
+    z-index: 9999;   /* 🔥 FIX */
 }
 
 .sidebar.collapsed button::after {
@@ -331,4 +328,13 @@ table {
     display: flex;
     flex-direction: column;
     align-items: center;
+}
+
+#auditPanel {
+    right: 0;
+    z-index: 2000;
+}
+
+#auditOverlay {
+    z-index: 1999;
 }

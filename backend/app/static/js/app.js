@@ -8,6 +8,22 @@ let historyStack = [];
 let redoStack = [];
 let auditOpen = false;
 
+function initMonthDropdown() {
+    const monthSelect = document.getElementById("monthSelect");
+    if (!monthSelect) return;
+
+    monthSelect.innerHTML = "";
+
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+    months.forEach((m, i) => {
+        const opt = document.createElement("option");
+        opt.value = i + 1;
+        opt.text = m;
+        monthSelect.appendChild(opt);
+    });
+}
+
 async function login() {
 
     const username = document.getElementById("username").value;
@@ -46,19 +62,26 @@ async function login() {
 
     alert("Login successful");
 
-    document.getElementById("loginBox").style.display = "none";
-
-    applyRoleUI();
-    loadRoster();
-
+    // 🔥 REDIRECT FIX
+    window.location.href = "/static/roster.html";
 }
 
 async function loadRoster() {
-    if (localStorage.getItem("token")) {
-        document.getElementById("loginBox").style.display = "none";
+
+    const token = localStorage.getItem("token");
+    const loginBox = document.getElementById("loginBox");
+
+    if (token && loginBox) {
+        loginBox.style.display = "none";
     }
-    const month = document.getElementById("monthSelect").value;
-    const year = document.getElementById("yearSelect").value;
+
+    const monthEl = document.getElementById("monthSelect");
+    const yearEl = document.getElementById("yearSelect");
+
+    if (!monthEl || !yearEl) return;
+
+    const month = monthEl.value;
+    const year = yearEl.value;
 
     if (!month || !year) {
         console.warn("Month/Year missing");
@@ -67,24 +90,28 @@ async function loadRoster() {
 
     const res = await fetch(`/roster?month=${month}&year=${year}`);
     const data = await res.json();
-    if (!data.length) return;
-    // ✅ ADD THIS BLOCK
-    const rosterStatus = data[0].status || "DRAFT";
 
-    document.getElementById("statusLabel").innerText =
-        rosterStatus === "FINAL" ? "🔒 FINAL" : "✏️ DRAFT";
+    if (!data || !data.length) return;
+
+    // ✅ STATUS
+    const statusLabel = document.getElementById("statusLabel");
+    if (statusLabel) {
+        const rosterStatus = data[0].status || "DRAFT";
+        statusLabel.innerText =
+            rosterStatus === "FINAL" ? "🔒 FINAL" : "✏️ DRAFT";
+    }
 
     rosterData = data;
     datesGlobal = Object.keys(data[0].shifts).sort();
+    const dates = datesGlobal;
 
-    const dates = Object.keys(data[0].shifts).sort();
+    const today = new Date();
 
+    // ✅ GROUPING
     const groups = {};
-
     data.forEach(emp => {
         const team = emp.team || "Others";
         if (!groups[team]) groups[team] = [];
-
         if (!groups[team].some(e => e.employee_id === emp.employee_id)) {
             groups[team].push(emp);
         }
@@ -93,11 +120,15 @@ async function loadRoster() {
     let html = "";
 
     for (const team in groups) {
-        html += `<h3>${team}</h3>`;
-        html += `<table border="1">`;
 
+        html += `<h3>${team}</h3>`;
+        html += `<table class="min-w-full border border-gray-300 text-sm">`;
+
+        // 🔹 HEADER
         html += "<tr><th>Employee</th>";
+
         dates.forEach(d => {
+
             const dateObj = new Date(d);
 
             const day = dateObj.toLocaleDateString("en-US", { weekday: "short" });
@@ -105,39 +136,42 @@ async function loadRoster() {
 
             const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
 
-            html += `<th style="${isWeekend ? 'background:#ffecec;' : ''}">
-                <div style="line-height:1.2;">
-                    <div style="font-size:11px;">${day}</div>
-                    <div style="font-size:13px; font-weight:bold;">${dateNum}</div>
-                </div>
-            </th>`;
-        });
-        // 👉 spacer column
-        html += `<th style="width:6px; background:#e5e7eb;"></th>`;
+            const isToday =
+                dateObj.getDate() === today.getDate() &&
+                dateObj.getMonth() === today.getMonth() &&
+                dateObj.getFullYear() === today.getFullYear();
 
-        // 👉 summary headers
+            let style = "";
+            if (isWeekend) style += "background:#ffecec;";
+            if (isToday) style += "background:#4f46e5;color:white;";
+
+            html += `<th style="${style}">
+                        <div style="line-height:1.2;">
+                            <div style="font-size:11px;">${day}</div>
+                            <div style="font-size:13px;font-weight:bold;">${dateNum}</div>
+                        </div>
+                     </th>`;
+        });
+
+        html += `<th style="width:6px;background:#e5e7eb;"></th>`;
         html += `<th>S1</th><th>S2</th><th>S3</th><th>G</th><th>WO</th><th>CO</th><th>GH</th><th>LV</th><th>WD</th>`;
         html += "</tr>";
 
+        // 🔹 EMPLOYEE ROWS
         groups[team].forEach(emp => {
 
-            // 👉 initialize counters
-            let counts = {
-                S1:0, S2:0, S3:0, G:0, WO:0, CO:0, GH:0, LV:0
-            };
+            let counts = { S1:0,S2:0,S3:0,G:0,WO:0,CO:0,GH:0,LV:0 };
 
             html += `<tr><td>${emp.employee_name}</td>`;
 
             dates.forEach(d => {
-                const shift = emp.shifts[d] || '-';
-                const comment = emp.comments ? emp.comments[d] : null;
 
-                if (counts[shift] !== undefined) {
-                    counts[shift]++;
-                }
+                const shift = emp.shifts[d] || '-';
+                const comment = emp.comments?.[d];
+
+                if (counts[shift] !== undefined) counts[shift]++;
 
                 let color = "#fff";
-
                 if (shift === "S1") color = "#cce5ff";
                 else if (shift === "S2") color = "#ffe5cc";
                 else if (shift === "S3") color = "#e6ccff";
@@ -150,256 +184,119 @@ async function loadRoster() {
                 const dateObj = new Date(d);
                 const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
 
+                const isToday =
+                    dateObj.getDate() === today.getDate() &&
+                    dateObj.getMonth() === today.getMonth() &&
+                    dateObj.getFullYear() === today.getFullYear();
+
                 let bgColor = color;
+                if (isToday) bgColor = "#e0e7ff";
+                if (isWeekend && shift === '-') bgColor = "#fff5f5";
 
-                if (isWeekend && shift === '-') {
-                    bgColor = "#fff5f5";
-                }
-
-                let extraClass = "";
-
-                if (comment) {
-                    extraClass = "comment-cell";
-                }
-
-                html += `<td class="${extraClass}"
+                html += `<td 
+                            class="${comment ? "comment-cell" : ""}" 
                             style="background:${bgColor}"
                             data-emp="${emp.employee_id}"
                             data-date="${d}"
-                            title="${comment || ''}">
+                            title="${comment || ""}">
                             ${shift}
                         </td>`;
             });
 
-            // 👉 spacer cell
             html += `<td style="background:#e5e7eb;"></td>`;
 
-            const workingDays = counts.S1 + counts.S2 + counts.S3 + counts.G;
-            // 👉 ADD RIGHT SIDE SUMMARY
-            html += "<td>"+counts.S1+"</td>" +
-                    "<td>"+counts.S2+"</td>" +
-                    "<td>"+counts.S3+"</td>" +
-                    "<td>"+counts.G+"</td>" +
-                    "<td>"+counts.WO+"</td>" +
-                    "<td>"+counts.CO+"</td>" +
-                    "<td>"+counts.GH+"</td>" +
-                    "<td>"+counts.LV+"</td>" +
-                    "<td><b>"+workingDays+"</b></td>";
+            const wd = counts.S1 + counts.S2 + counts.S3 + counts.G;
+
+            html += `
+                <td>${counts.S1}</td>
+                <td>${counts.S2}</td>
+                <td>${counts.S3}</td>
+                <td>${counts.G}</td>
+                <td>${counts.WO}</td>
+                <td>${counts.CO}</td>
+                <td>${counts.GH}</td>
+                <td>${counts.LV}</td>
+                <td><b>${wd}</b></td>
+            `;
 
             html += "</tr>";
         });
 
-        // html += `<tr style="height:2px;"></tr>`;
+        // 🔹 SPACER
+        html += `<tr><td colspan="${dates.length + 11}" style="height:8px;background:#f5f7fb;"></td></tr>`;
 
-        // html += `<tr style="background:#eef2ff; font-weight:bold;">
-        //     <td colspan="${dates.length + 10}" style="text-align:center;">
-        //         Shift Summary
-        //     </td>
-        // </tr>`;
-
-        // spacer row
-        html += `<tr>
-            <td colspan="${dates.length + 11}" style="height:8px; background:#f5f7fb;"></td>
-        </tr>`;
-
-        // Employee column
-        html += `<td><b>Shift Summary</b></td>`;
-
-        // date columns
-        for (let i = 0; i < dates.length; i++) {
-            html += `<td></td>`;
-        }
-
-        // spacer
+        // 🔹 SHIFT SUMMARY HEADER (FIXED)
+        html += `<tr><td><b>Shift Summary</b></td>`;
+        for (let i=0;i<dates.length;i++) html += `<td></td>`;
         html += `<td style="background:#e5e7eb;"></td>`;
-
-        // summary columns (9)
-        for (let i = 0; i < 9; i++) {
-            html += `<td></td>`;
-        }
-
+        for (let i=0;i<9;i++) html += `<td></td>`;
         html += `</tr>`;
 
-        // 👉 Pivot summary (Shift vs Date)
-        let pivot = {
-            S1:{}, S2:{}, S3:{}, G:{}, WO:{}, CO:{}, GH:{}, LV:{}
-        };
+        // 🔹 PIVOT
+        let pivot = { S1:{},S2:{},S3:{},G:{},WO:{},CO:{},GH:{},LV:{} };
 
-        // initialize
-        dates.forEach(d => {
-            Object.keys(pivot).forEach(shift => {
-                pivot[shift][d] = 0;
+        dates.forEach(d=>{
+            Object.keys(pivot).forEach(s=>pivot[s][d]=0);
+        });
+
+        groups[team].forEach(emp=>{
+            dates.forEach(d=>{
+                const s = emp.shifts[d] || '-';
+                if (pivot[s]) pivot[s][d]++;
             });
         });
 
-        // fill data
-        groups[team].forEach(emp => {
-            dates.forEach(d => {
-                const shift = emp.shifts[d] || '-';
-                const comment = emp.comments ? emp.comments[d] : null;
-
-                if (pivot[shift]) {
-                    pivot[shift][d]++;
-                }
+        Object.keys(pivot).forEach(s=>{
+            html += `<tr style="background:#e8f0fe;font-weight:bold;"><td>${s}</td>`;
+            dates.forEach(d=>{
+                let val = pivot[s][d];
+                let style="";
+                if (val>2) style="background:#28a745;color:white;";
+                else if (val<2) style="background:#dc3545;color:white;";
+                html += `<td style="${style}">${val}</td>`;
             });
-        });
-
-        // 👉 render pivot rows
-        Object.keys(pivot).forEach(shift => {
-
-            html += `<tr style="background:#e8f0fe; font-weight:bold;">
-                <td style="background:#e8f0fe;">
-                    <b>${shift}</b>
-                </td>`;
-
-            dates.forEach(d => {
-                const count = pivot[shift][d];
-
-                let style = "font-weight:normal;";
-
-                if (count > 2) {
-                    style += "background:#28a745; color:white; font-weight:bold;";
-                } else if (count < 2) {
-                    style += "background:#dc3545; color:white; font-weight:bold;";
-                }
-
-                html += `<td style="${style}">${count}</td>`;
-            });
-
-            // empty for right-side summary columns
-            // divider column
             html += `<td style="background:#e5e7eb;"></td>`;
-
-            // remaining empty summary columns
-            for (let i = 0; i < 9; i++) {
-                html += `<td></td>`;
-            }
-
+            for (let i=0;i<9;i++) html+=`<td></td>`;
             html += `</tr>`;
         });
 
-        // 👉 TOTAL RESOURCES ROW
-        html += `<tr style="background:#d1fae5; font-weight:bold;">
-            <td><b>Total</b></td>`;
-
-        dates.forEach(d => {
-            const total =
-                pivot.S1[d] +
-                pivot.S2[d] +
-                pivot.S3[d] +
-                pivot.G[d];
-
-            html += `<td style="background:#059669; color:white;">${total}</td>`;
+        // 🔹 TOTAL
+        html += `<tr style="background:#d1fae5;font-weight:bold;"><td>Total</td>`;
+        dates.forEach(d=>{
+            let t = pivot.S1[d]+pivot.S2[d]+pivot.S3[d]+pivot.G[d];
+            html += `<td style="background:#059669;color:white;">${t}</td>`;
         });
-
-        // divider column
         html += `<td style="background:#e5e7eb;"></td>`;
-
-        // remaining summary columns
-        for (let i = 0; i < 9; i++) {
-            html += `<td></td>`;
-        }
-
+        for (let i=0;i<9;i++) html+=`<td></td>`;
         html += `</tr>`;
 
         html += "</table><br>";
     }
 
-    document.getElementById("rosterTable").innerHTML = html;
+    const tableEl = document.getElementById("rosterTable");
+    if (tableEl) tableEl.innerHTML = html;
 
-    const bulkSelect = document.getElementById("bulkSelect");
+    attachEvents();
 
-    if (bulkSelect) {
-        bulkSelect.onchange = async function() {
-            if (!localStorage.getItem("token")) {
-                alert("Login required");
-                return;
-            }
-            const shift = this.value;
-            if (!shift) return;
-
-            redoStack = [];
-
-            for (let item of selectedCells) {
-                const res = await fetch(`/roster-entry?employee_id=${item.empId}&date=${item.date}&shift_code=${shift}`, {
-                    method: "PUT",
-                    headers: {
-                        "Authorization": "Bearer " + localStorage.getItem("token")
-                    }
-                });
-
-                if (res.status === 401) {
-                    alert("Session expired. Please login again.");
-                    localStorage.removeItem("token");
-                    loadRoster();
-                    return;
-                }
-
-                const oldValue = item.cell.innerText.trim();
-
-                historyStack.push({
-                    empId: item.empId,
-                    date: item.date,
-                    oldValue,
-                    newValue: shift
-                });
-
-                // redoStack = []; // ✅ CLEAR REDO STACK
-
-                const existingComment = item.cell.title;
-
-                item.cell.innerHTML = shift;
-                applyColor(item.cell, shift);
-
-                // restore comment style
-                if (existingComment) {
-                    item.cell.title = existingComment;
-                    item.cell.classList.add("comment-cell");
-                }
-                // 🔥 ADD THIS
-                updateRowSummary(item.empId, oldValue, shift);
-                updatePivot(item.date, oldValue, shift);
-            }
-
-            clearSelection();
-            document.getElementById("bulkDropdown").style.display = "none";
-            // ✅ ADD THIS LINE HERE
-            document.getElementById("bulkSelect").value = "";
-        };
-    }
-
-    const token = localStorage.getItem("token");
-
-    const createBtn = document.querySelector("button[onclick='createRoster()']");
-    const addBtn = document.querySelector("button[onclick='showAddEmployee()']");
-    const delBtn = document.querySelector("button[onclick='deleteEmployee()']");
-    const adminSection = document.getElementById("adminSection");
+    // 🔹 SAFE ROLE UI
+    const undoBtn = document.getElementById("undoBtn");
+    const redoBtn = document.getElementById("redoBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const finalizeBtn = document.getElementById("finalizeBtn");
 
     if (!token) {
-        document.getElementById("undoBtn").style.display = "none";
-        document.getElementById("redoBtn").style.display = "none";
-        document.getElementById("logoutBtn").style.display = "none";
-        document.getElementById("loginBox").style.display = "block";
-        document.getElementById("finalizeBtn").style.display = "none";
-
-        if (createBtn) createBtn.style.display = "none";
-        if (addBtn) addBtn.style.display = "none";
-        if (delBtn) delBtn.style.display = "none";
-        if (adminSection) adminSection.style.display = "none";
-
+        if (undoBtn) undoBtn.style.display = "none";
+        if (redoBtn) redoBtn.style.display = "none";
+        if (logoutBtn) logoutBtn.style.display = "none";
+        if (loginBox) loginBox.style.display = "block";
+        if (finalizeBtn) finalizeBtn.style.display = "none";
     } else {
-        document.getElementById("undoBtn").style.display = "inline-block";
-        document.getElementById("redoBtn").style.display = "inline-block";
-        document.getElementById("logoutBtn").style.display = "inline-block";
-        document.getElementById("loginBox").style.display = "none";
-        document.getElementById("finalizeBtn").style.display = "inline-block";
-
-        if (createBtn) createBtn.style.display = "inline-block";
-        if (addBtn) addBtn.style.display = "inline-block";
-        if (delBtn) delBtn.style.display = "inline-block";
-        if (adminSection) adminSection.style.display = "block";
-}
-    attachEvents(); // ✅ IMPORTANT
+        if (undoBtn) undoBtn.style.display = "inline-block";
+        if (redoBtn) redoBtn.style.display = "inline-block";
+        if (logoutBtn) logoutBtn.style.display = "inline-block";
+        if (loginBox) loginBox.style.display = "none";
+        if (finalizeBtn) finalizeBtn.style.display = "inline-block";
+    }
 }
 
 function attachEvents() {
@@ -806,13 +703,8 @@ function reloadRoster() {
 }
 
 function logout() {
-
     localStorage.removeItem("token");
-
-    alert("Logged out");
-
-    applyRoleUI();
-    loadRoster(); // reload UI
+    window.location.href = "/static/roster.html";
 }
 
 async function finalizeRoster() {
@@ -904,63 +796,15 @@ async function showAddEmployee() {
     loadRoster();
 }
 
-async function deleteEmployee() {
-
-    if (!localStorage.getItem("token")) {
-        alert("Admin login required");
-        return;
-    }
-
-    const res = await fetch("/employees");
-    const employees = await res.json();
-
-    const dropdown = document.getElementById("employeeDropdown");
-    dropdown.innerHTML = "";
-
-    employees.forEach(emp => {
-        const option = document.createElement("option");
-        option.value = emp.id;
-        option.text = `${emp.name} (${emp.team})`;
-        dropdown.appendChild(option);
-    });
-
-    document.getElementById("employeePopup").style.display = "block";
-}
-
-async function confirmDeleteEmployee() {
-
-    const empId = document.getElementById("employeeDropdown").value;
-
-    if (!confirm("Are you sure you want to remove this employee?")) return;
-
-    const res = await fetch(`/employees/${empId}`, {
-        method: "DELETE",
-        headers: {
-            "Authorization": "Bearer " + localStorage.getItem("token")
-        }
-    });
-
-    const data = await res.json();
-
-    if (res.status !== 200) {
-        alert(data.detail || "Failed to delete employee");
-        return;
-    }
-
-    alert("Employee removed");
-
-    closeEmployeePopup();
-    loadRoster();
-}
-
-function closeEmployeePopup() {
-    document.getElementById("employeePopup").style.display = "none";
-}
-
 function exportRoster() {
 
     const month = document.getElementById("monthSelect").value;
     const year = document.getElementById("yearSelect").value;
+
+    if (!month || !year) {
+        alert("Please select month & year");
+        return;
+    }
 
     window.open(`/roster/export?month=${month}&year=${year}`, "_blank");
 }
@@ -1055,7 +899,7 @@ async function loadAuditLogs() {
         if (log.old === "COMMENT") {
             text = `💬 ${log.user} added comment for ${log.employee}`;
         } else {
-            text = `🔄 ${log.employee}: ${log.old || '-'} → ${log.new}`;
+            text = `🔄 ${log.user} changed ${log.employee}: ${log.old || '-'} → ${log.new}`;
         }
 
         html += `
@@ -1077,20 +921,15 @@ function toggleAudit() {
     const overlay = document.getElementById("auditOverlay");
 
     if (auditOpen) {
-        panel.style.transform = "translateX(100%)";  // close
-        overlay.style.display = "none";
+        panel.classList.add("translate-x-full");
+        overlay.classList.add("hidden");
     } else {
-        panel.style.transform = "translateX(0%)";    // open
-        overlay.style.display = "block";
+        panel.classList.remove("translate-x-full");
+        overlay.classList.remove("hidden");
         loadAuditLogs();
     }
 
     auditOpen = !auditOpen;
-}
-
-function toggleAdminMenu() {
-    const menu = document.getElementById("adminDropdown");
-    menu.style.display = (menu.style.display === "block") ? "none" : "block";
 }
 
 document.addEventListener("keydown", function (e) {
@@ -1108,33 +947,233 @@ function toggleSidebar() {
     main.classList.toggle("expanded");
 }
 
-function setActive(btn) {
+async function loadEmployees() {
 
-    document.querySelectorAll(".sidebar button").forEach(b => {
-        b.classList.remove("active");
+    const res = await fetch("/employees");
+    const data = await res.json();
+
+    let html = "";
+
+    data.forEach(emp => {
+        html += `
+            <tr class="border-b">
+                <td class="p-2">${emp.name}</td>
+                <td class="p-2">${emp.team}</td>
+                <td class="p-2">
+                    <button 
+                        class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
+                        onclick="deleteEmployeeById(${emp.id})">
+                        Delete
+                    </button>
+                </td>
+            </tr>
+        `;
     });
 
-    btn.classList.add("active");
+    document.getElementById("employeeList").innerHTML = html;
+}
+
+async function deleteEmployeeById(empId) {
+
+    if (!localStorage.getItem("token")) {
+        alert("Admin login required");
+        return;
+    }
+
+    if (!confirm("Are you sure you want to delete this employee?")) return;
+
+    const res = await fetch(`/employees/${empId}`, {
+        method: "DELETE",
+        headers: {
+            "Authorization": "Bearer " + localStorage.getItem("token")
+        }
+    });
+
+    const data = await res.json();
+
+    if (res.status !== 200) {
+        alert(data.detail || "Failed to delete employee");
+        return;
+    }
+
+    alert("Employee deleted successfully");
+
+    loadEmployees(); // refresh table
+}
+
+async function addEmployee() {
+
+    const name = document.getElementById("empName").value;
+    const team = document.getElementById("empTeam").value;
+
+    if (!name || !team) {
+        alert("Enter name and team");
+        return;
+    }
+
+    const res = await fetch("/employees", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + localStorage.getItem("token")
+        },
+        body: JSON.stringify({ name, team })
+    });
+
+    const data = await res.json();
+
+    if (res.status !== 200) {
+        alert("Failed to add employee");
+        return;
+    }
+
+    alert("Employee added");
+
+    document.getElementById("empName").value = "";
+    document.getElementById("empTeam").value = "";
+
+    loadEmployees();
+}
+
+async function loadAdmins() {
+
+    const res = await fetch("/admin-users", {
+        headers: {
+            "Authorization": "Bearer " + localStorage.getItem("token")
+        }
+    });
+
+    const data = await res.json();
+
+    let html = "";
+
+    data.forEach(admin => {
+        html += `
+            <tr class="border-b">
+                <td class="p-2">${admin.id}</td>
+                <td class="p-2">${admin.username}</td>
+                <td class="p-2">
+                    <button 
+                        class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
+                        onclick="deleteAdminById(${admin.id})">
+                        Delete
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    document.getElementById("adminList").innerHTML = html;
+}
+
+async function addAdmin() {
+
+    const username = document.getElementById("adminUsername").value;
+    const password = document.getElementById("adminPassword").value;
+
+    if (!username || !password) {
+        alert("Enter username & password");
+        return;
+    }
+
+    const res = await fetch("/admin-users", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + localStorage.getItem("token")
+        },
+        body: JSON.stringify({ username, password })
+    });
+
+    if (res.status !== 200) {
+        alert("Failed to add admin");
+        return;
+    }
+
+    alert("Admin added");
+
+    document.getElementById("adminUsername").value = "";
+    document.getElementById("adminPassword").value = "";
+
+    loadAdmins();
+}
+
+async function deleteAdminById(id) {
+
+    if (!confirm("Are you sure you want to delete this admin?")) return;
+
+    const res = await fetch(`/admin-users/${id}`, {
+        method: "DELETE",
+        headers: {
+            "Authorization": "Bearer " + localStorage.getItem("token")
+        }
+    });
+
+    if (res.status !== 200) {
+        alert("Failed to delete admin");
+        return;
+    }
+
+    alert("Admin deleted");
+
+    loadAdmins();
+}
+
+function initSidebar(page) {
+
+    const token = localStorage.getItem("token");
+
+    // 🔹 Page buttons
+    const rosterBtn = document.getElementById("navRoster");
+    const reportsBtn = document.getElementById("navReports");
+    const empBtn = document.getElementById("navEmployees");
+    const adminBtn = document.getElementById("navAdmin");
+
+    if (page === "roster" && rosterBtn) rosterBtn.style.display = "none";
+    if (page === "reports" && reportsBtn) reportsBtn.style.display = "none";
+    if (page === "employees" && empBtn) empBtn.style.display = "none";
+    if (page === "admin" && adminBtn) adminBtn.style.display = "none";
+
+    // 🔹 Login / Logout
+    const loginBtn = document.getElementById("loginBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const userLabel = document.getElementById("userLabel");
+
+    if (token) {
+        if (loginBtn) loginBtn.style.display = "none";
+        if (logoutBtn) logoutBtn.style.display = "block";
+
+        if (userLabel) {
+            userLabel.innerText = "👤 Logged In";
+            userLabel.style.display = "block";
+        }
+    } else {
+        if (loginBtn) loginBtn.style.display = "block";
+        if (logoutBtn) logoutBtn.style.display = "none";
+
+        if (userLabel) userLabel.style.display = "none";
+    }
 }
 
 document.addEventListener("DOMContentLoaded", function () {
 
+    initMonthDropdown();
+
     const today = new Date();
 
-    document.getElementById("monthSelect").value = today.getMonth() + 1;
-    document.getElementById("yearSelect").value = today.getFullYear();
+    if (document.getElementById("monthSelect")) {
+        document.getElementById("monthSelect").value = today.getMonth() + 1;
+    }
 
-    document.getElementById("auditOverlay").onclick = function () {
-        toggleAudit();
-    };
-
-    const panel = document.getElementById("auditPanel");
-    panel.style.transform = "translateX(100%)";
+    if (document.getElementById("yearSelect")) {
+        document.getElementById("yearSelect").value = today.getFullYear();
+    }
 
     applyRoleUI();
-    if (document.getElementById("rosterTable")) {
-        loadRoster();
-    }
+
+    if (document.getElementById("rosterTable")) loadRoster();
+    if (document.getElementById("employeeList")) loadEmployees();
+    if (document.getElementById("adminList")) loadAdmins();
 });
 
 // ✅ ADD THIS BELOW

@@ -2,175 +2,113 @@
 <html>
 <head>
     <title>Shift Roster</title>
-    <link rel="stylesheet" href="/static/css/styles.css">
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
+<body class="bg-gray-100">
 
-<div class="layout">
+<div class="flex">
 
     <!-- 🔥 SIDEBAR -->
-    <div class="sidebar">
+    <div class="w-60 bg-white shadow-md h-screen p-4 fixed">
 
-        <button id="toggleSidebarBtn" onclick="toggleSidebar()" style="margin-bottom:10px;">☰</button>
+        <h2 class="text-xl font-bold mb-6 text-indigo-600">📊 NOC Panel</h2>
 
-        <h3>📊 NOC Panel</h3>
+        <div class="space-y-2">
+            <button id="navRoster" onclick="location.href='roster.html'" class="w-full text-left px-3 py-2 rounded hover:bg-gray-200">📅 Roster</button>
 
-        <button onclick="setActive(this); reloadRoster()" title="Roster">
-            📅 <span>Roster</span>
-        </button>
+            <button id="navReports" onclick="location.href='reports.html'" class="w-full text-left px-3 py-2 rounded hover:bg-gray-200">📊 Reports</button>
 
-        <button onclick="setActive(this); exportRoster()" title="Export">
-            📊 <span>Export</span>
-        </button>
+            <button id="navEmployees" onclick="location.href='employees.html'" class="w-full text-left px-3 py-2 rounded hover:bg-gray-200">👥 Employees</button>
 
-        <button onclick="setActive(this); toggleAudit()" title="Audit Logs">
-            📜 <span>Audit</span>
-        </button>
-
-        <hr>
-
-        <div id="adminSection">
-            <h4>Admin</h4>
-            <button onclick="setActive(this); createRoster()" title="Create Roster">
-                🆕 <span>Create Roster</span>
-            </button>
-
-            <button onclick="setActive(this); showAddEmployee()" title="Add Employee">
-                ➕ <span>Add Employee</span>
-            </button>
-
-            <button onclick="setActive(this); deleteEmployee()" title="Remove Employee">
-                ❌ <span>Remove Employee</span>
-            </button>
-
-            <button onclick="setActive(this); showAddAdmin()" title="Add Admin">
-                👤➕ <span>Add Admin</span>
-            </button>
-
-            <button onclick="setActive(this); deleteAdmin()" title="Remove Admin">
-                👤❌ <span>Remove Admin</span>
-            </button>
+            <button id="navAdmin" onclick="location.href='admin.html'" class="w-full text-left px-3 py-2 rounded hover:bg-gray-200">🛠 Admin</button>
         </div>
 
-        <hr>
+        <hr class="my-4">
 
-        <button onclick="setActive(this); logout()">🚪 Logout</button>
+        <!-- 🔥 USER -->
+        <div id="userLabel" class="text-sm text-gray-600 mb-2 hidden"></div>
+
+        <button id="loginBtn" onclick="location.href='login.html'"
+            class="w-full text-left px-3 py-2 rounded hover:bg-gray-200">
+            🔐 Login
+        </button>
+
+        <button id="logoutBtn" onclick="logout()"
+            class="w-full text-left px-3 py-2 rounded hover:bg-gray-200 hidden">
+            🚪 Logout
+        </button>
 
     </div>
 
     <!-- 🔥 MAIN CONTENT -->
-    <div class="main">
+    <div class="ml-64 p-6 w-full">
 
         <!-- TOP BAR -->
-        <div class="topbar">
-            <select id="monthSelect">
-                <option value="1">Jan</option>
-                <option value="2">Feb</option>
-                <option value="3">Mar</option>
-                <option value="4">Apr</option>
-                <option value="5">May</option>
-                <option value="6">Jun</option>
-                <option value="7">Jul</option>
-                <option value="8">Aug</option>
-                <option value="9">Sep</option>
-                <option value="10">Oct</option>
-                <option value="11">Nov</option>
-                <option value="12">Dec</option>
-            </select>
-            <input type="number" id="yearSelect">
-            <button onclick="reloadRoster()">Load</button>
+        <div class="flex items-center gap-3 mb-4">
 
-            <span id="statusLabel"></span>
+            <select id="monthSelect" class="border px-3 py-2 rounded"></select>
+
+            <input id="yearSelect"
+                   type="number"
+                   class="border px-3 py-2 rounded w-28">
+
+            <button onclick="loadRoster()"
+                    class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">
+                Load
+            </button>
+
+            <span id="statusLabel" class="ml-4 font-semibold"></span>
+
         </div>
 
-        <div id="loginBox">
-            <input id="username" placeholder="Username">
-            <input id="password" type="password" placeholder="Password">
-            <button onclick="login()">Login</button>
+        <h2 class="text-2xl font-bold mb-4 text-gray-700">Shift Roster</h2>
+
+        <!-- ACTION BAR -->
+        <div class="flex gap-2 mb-4">
+
+            <button onclick="undoLastChange()"
+                    class="bg-gray-600 text-white px-3 py-2 rounded">
+                Undo
+            </button>
+
+            <button onclick="redoLastChange()"
+                    class="bg-gray-600 text-white px-3 py-2 rounded">
+                Redo
+            </button>
+
+            <button onclick="finalizeRoster()"
+                    class="bg-green-600 text-white px-3 py-2 rounded">
+                Finalize
+            </button>
+
+            <button onclick="toggleAudit()"
+                    class="bg-indigo-600 text-white px-3 py-2 rounded">
+                Audit Logs
+            </button>
+
         </div>
 
-        <h2>Shift Roster</h2>
-
-        <div class="action-bar">
-            <button id="undoBtn" onclick="undoLastChange()">Undo</button>
-            <button id="redoBtn" onclick="redoLastChange()">Redo</button>
-            <button id="finalizeBtn" onclick="finalizeRoster()">Finalize</button>
-        </div>
-
-        <div id="rosterTable"></div>
+        <!-- 🔥 TABLE -->
+        <div id="rosterTable" class="overflow-auto bg-white p-4 rounded shadow"></div>
 
     </div>
 
 </div>
 
-<div id="auditOverlay" style="
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.2);
-    display: none;
-    z-index: 9998;
-"></div>
-<div id="auditPanel" style="
-    position: fixed;
-    right: 0;
-    top: 0;
-    width: 320px;
-    height: 100%;
-    background: white;
-    border-left: 1px solid #ccc;
-    overflow-y: auto;
-    padding: 12px;
-    z-index: 9999;
-    transform: translateX(100%);
-    transition: transform 0.3s ease;
-    box-shadow: -4px 0 15px rgba(0,0,0,0.2);
-">
-    <h3>Audit Logs</h3>
+<!-- 🔥 AUDIT PANEL -->
+<div id="auditOverlay" class="fixed inset-0 bg-black bg-opacity-20 hidden z-40"></div>
+
+<div id="auditPanel"
+     class="fixed right-0 top-0 h-full w-80 bg-white shadow-lg p-4 z-50 transform translate-x-full transition-transform duration-300">
+
+    <h3 class="text-lg font-bold mb-3">Audit Logs</h3>
     <div id="auditContent"></div>
-</div>
-<div id="bulkDropdown" style="
-    display:none;
-    position:absolute;
-    background:white;
-    border:1px solid #ccc;
-    padding:5px;
-    z-index:1000;
-">
-    <select id="bulkSelect">
-        <option value="">Select Shift</option>
-        <option>S1</option>
-        <option>S2</option>
-        <option>S3</option>
-        <option>G</option>
-        <option>WO</option>
-        <option>CO</option>
-        <option>GH</option>
-        <option>LV</option>
-    </select>
-</div>
-<div id="employeePopup" style="
-    display:none;
-    position:fixed;
-    top:30%;
-    left:40%;
-    background:white;
-    padding:15px;
-    border:1px solid #ccc;
-    box-shadow:0 2px 10px rgba(0,0,0,0.2);
-    z-index:2000;
-">
-    <h4>Select Employee</h4>
 
-    <select id="employeeDropdown"></select>
-
-    <br><br>
-
-    <button onclick="confirmDeleteEmployee()">Delete</button>
-    <button onclick="closeEmployeePopup()">Cancel</button>
 </div>
+
 <script src="/static/js/app.js"></script>
+<script>
+    initSidebar("roster");
+</script>
 </body>
 </html>
