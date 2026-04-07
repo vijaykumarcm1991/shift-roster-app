@@ -1,0 +1,173 @@
+table {
+    border-collapse: collapse;
+    width: 100%;
+}
+th, td {
+    border: 1px solid #ccc;
+    padding: 5px;
+    text-align: center;
+}
+
+th {
+    cursor: default;
+}
+
+td:hover {
+    background-color: #f0f0f0 !important;
+}
+
+h3 {
+    margin-top: 20px;
+    color: #333;
+}
+
+th {
+    position: sticky;
+    top: 0;
+    background: #f2f2f2;
+    z-index: 2;
+}
+
+td:first-child {
+    text-align: left;
+    white-space: nowrap;
+}
+
+tr:hover td {
+    background-color: #f9f9f9;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: #f5f7fb;
+    margin: 20px;
+}
+
+h2 {
+    color: #333;
+}
+
+table {
+    border-collapse: collapse;
+    margin-bottom: 25px;
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+th {
+    background: #eef2ff;
+    color: #333;
+    font-size: 12px;
+    padding: 8px;
+    text-align: center;
+}
+
+td {
+    text-align: center;
+    padding: 6px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+tr:hover td {
+    background-color: #f9f9f9;
+}
+
+button {
+    background: #4f46e5;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-right: 5px;
+}
+
+button:hover {
+    background: #4338ca;
+}
+
+.comment-cell {
+    position: relative;
+}
+
+.comment-cell::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 0;
+    height: 0;
+    border-top: 10px solid red;
+    border-left: 10px solid transparent;
+}
+
+th {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+th:first-child, td:first-child {
+    min-width: 180px;
+    max-width: 220px;
+    width: 200px;
+}
+
+th, td {
+    white-space: nowrap;
+}
+
+/* Date columns ONLY (exclude employee + spacer + summary) */
+th:nth-child(n+2):nth-last-child(n+10),
+td:nth-child(n+2):nth-last-child(n+10) {
+    min-width: 70px;
+    text-align: center;
+}
+
+/* Summary columns (S1–WD) */
+th:nth-last-child(-n+9),
+td:nth-last-child(-n+9) {
+    min-width: 45px;
+    max-width: 55px;
+    font-weight: bold;
+}
+
+table {
+    table-layout: auto;
+}
+
+#rosterTable {
+    overflow-x: auto;
+}
+
+.admin-menu {
+    display: inline-block;
+    position: relative;
+}
+
+.dropdown {
+    display: none;
+    position: absolute;
+    top: 38px;
+    left: 0;
+    background: white;
+    border: 1px solid #ccc;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    padding: 5px;
+    z-index: 1000;
+}
+
+.dropdown button {
+    display: block;
+    width: 100%;
+    margin: 3px 0;
+}
+
+.admin-menu button {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
