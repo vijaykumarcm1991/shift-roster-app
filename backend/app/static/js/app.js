@@ -147,7 +147,7 @@ async function loadRoster() {
             if (isToday) style += "background:#4f46e5;color:white;";
 
             html += `<th 
-                        class="px-6 py-4 border border-gray-300 text-center rounded-xl bg-gray-50"
+                        class="px-6 py-4 sticky top-0 bg-gray-100 z-10 border border-gray-300 text-center rounded-xl bg-gray-50"
                         style="${style}; min-width:75px;">
                         <div style="line-height:1.2;">
                             <div style="font-size:11px;">${day}</div>
@@ -157,7 +157,17 @@ async function loadRoster() {
         });
 
         html += `<th style="width:6px;background:#e5e7eb;"></th>`;
-        html += `<th>S1</th><th>S2</th><th>S3</th><th>G</th><th>WO</th><th>CO</th><th>GH</th><th>LV</th><th>WD</th>`;
+        html += `
+                <th class="px-4 py-2 text-center border border-gray-300 rounded-lg bg-gray-50">S1</th>
+                <th class="px-4 py-2 text-center border border-gray-300 rounded-lg bg-gray-50">S2</th>
+                <th class="px-4 py-2 text-center border border-gray-300 rounded-lg bg-gray-50">S3</th>
+                <th class="px-4 py-2 text-center border border-gray-300 rounded-lg bg-gray-50">G</th>
+                <th class="px-4 py-2 text-center border border-gray-300 rounded-lg bg-gray-50">WO</th>
+                <th class="px-4 py-2 text-center border border-gray-300 rounded-lg bg-gray-50">CO</th>
+                <th class="px-4 py-2 text-center border border-gray-300 rounded-lg bg-gray-50">GH</th>
+                <th class="px-4 py-2 text-center border border-gray-300 rounded-lg bg-gray-50">LV</th>
+                <th class="px-4 py-2 text-center border border-gray-300 rounded-lg bg-gray-50">WD</th>
+                `;
         html += "</tr>";
 
         // 🔹 EMPLOYEE ROWS
@@ -166,7 +176,7 @@ async function loadRoster() {
             let counts = { S1:0,S2:0,S3:0,G:0,WO:0,CO:0,GH:0,LV:0 };
 
             html += `<tr>
-                <td class="px-6 py-4 border border-gray-300 rounded-xl whitespace-nowrap font-medium">
+                <td class="px-6 py-4 sticky left-0 bg-white z-10 border border-gray-300 rounded-xl whitespace-nowrap font-medium">
                     ${emp.employee_name}
                 </td>`;
 
@@ -214,15 +224,15 @@ async function loadRoster() {
             const wd = counts.S1 + counts.S2 + counts.S3 + counts.G;
 
             html += `
-                <td class="px-6 py-4 text-center border border-gray-300 rounded-xl bg-gray-50">${counts.S1}</td>
-                <td class="px-6 py-4 text-center border border-gray-300 rounded-xl bg-gray-50">${counts.S2}</td>
-                <td class="px-6 py-4 text-center border border-gray-300 rounded-xl bg-gray-50">${counts.S3}</td>
-                <td class="px-6 py-4 text-center border border-gray-300 rounded-xl bg-gray-50">${counts.G}</td>
-                <td class="px-6 py-4 text-center border border-gray-300 rounded-xl bg-gray-50">${counts.WO}</td>
-                <td class="px-6 py-4 text-center border border-gray-300 rounded-xl bg-gray-50">${counts.CO}</td>
-                <td class="px-6 py-4 text-center border border-gray-300 rounded-xl bg-gray-50">${counts.GH}</td>
-                <td class="px-6 py-4 text-center border border-gray-300 rounded-xl bg-gray-50">${counts.LV}</td>
-                <td class="px-6 py-4 text-center border border-gray-300 rounded-xl bg-gray-50"><b>${wd}</b></td>
+                <td class="px-4 py-2 text-center border border-gray-300 rounded-lg bg-gray-50">${counts.S1}</td>
+                <td class="px-4 py-2 text-center border border-gray-300 rounded-lg bg-gray-50">${counts.S2}</td>
+                <td class="px-4 py-2 text-center border border-gray-300 rounded-lg bg-gray-50">${counts.S3}</td>
+                <td class="px-4 py-2 text-center border border-gray-300 rounded-lg bg-gray-50">${counts.G}</td>
+                <td class="px-4 py-2 text-center border border-gray-300 rounded-lg bg-gray-50">${counts.WO}</td>
+                <td class="px-4 py-2 text-center border border-gray-300 rounded-lg bg-gray-50">${counts.CO}</td>
+                <td class="px-4 py-2 text-center border border-gray-300 rounded-lg bg-gray-50">${counts.GH}</td>
+                <td class="px-4 py-2 text-center border border-gray-300 rounded-lg bg-gray-50">${counts.LV}</td>
+                <td class="px-4 py-2 text-center border border-gray-300 rounded-lg bg-gray-50"><b>${wd}</b></td>
             `;
 
             html += "</tr>";
@@ -233,7 +243,7 @@ async function loadRoster() {
 
         // 🔹 SHIFT SUMMARY HEADER (FIXED)
         html += `<tr>
-            <td class="px-6 py-4 font-bold text-gray-700">
+            <td class="px-4 py-2 font-bold text-gray-700 border border-gray-300 rounded-lg bg-gray-50">
                 Shift Summary
             </td>`;
         for (let i=0;i<dates.length;i++) html += `<td></td>`;
@@ -256,14 +266,15 @@ async function loadRoster() {
         });
 
         Object.keys(pivot).forEach(s=>{
-            html += `<tr style="background:#e8f0fe;font-weight:bold;"><td>${s}</td>`;
+            html += `<tr class="font-semibold">
+                    <td class="px-4 py-2 border border-gray-300 rounded-lg bg-blue-50">${s}</td>`;
             dates.forEach(d=>{
                 let val = pivot[s][d];
                 let style="";
                 if (val > 2) style="background:#16a34a;color:white;";
                 else if (val < 2) style="background:#fecaca;color:#7f1d1d;";
                 html += `<td 
-                        class="px-6 py-4 text-center border border-gray-300 rounded-xl"style="${style}">${val}
+                        class="px-4 py-2 text-center border border-gray-300 rounded-lg" style="${style}">${val}
                     </td>`;
             });
             html += `<td style="background:#e5e7eb;"></td>`;
@@ -272,10 +283,12 @@ async function loadRoster() {
         });
 
         // 🔹 TOTAL
-        html += `<tr style="background:#d1fae5;font-weight:bold;"><td>Total</td>`;
+        html += `<tr class="font-bold">
+                <td class="px-4 py-2 border border-gray-300 rounded-lg bg-green-100">Total</td>`;
         dates.forEach(d=>{
             let t = pivot.S1[d]+pivot.S2[d]+pivot.S3[d]+pivot.G[d];
-            html += `<td style="background:#059669;color:white;">${t}</td>`;
+            html += `<td class="px-4 py-2 text-center border border-gray-300 rounded-lg"
+                         style="background:#059669;color:white;">${t}</td>`;
         });
         html += `<td style="background:#e5e7eb;"></td>`;
         for (let i=0;i<9;i++) html+=`<td></td>`;
@@ -306,27 +319,28 @@ function attachEvents() {
     const table = document.getElementById("rosterTable");
 
     // ✅ PREVENT DUPLICATE EVENT BINDING
-    if (table.dataset.eventsAttached === "true") return;
-    table.dataset.eventsAttached = "true";
+    table.replaceWith(table.cloneNode(true));
+    const newTable = document.getElementById("rosterTable");
 
     // 🔥 EVENT DELEGATION (FIX)
-    table.addEventListener("click", (e) => {
+    newTable.addEventListener("click", (e) => {
 
         const cell = e.target.closest("td");
         if (!cell || !cell.dataset.emp) return;
 
         if (dragCompleted) {
             dragCompleted = false;
+            return; // ✅ PREVENT CLICK AFTER DRAG
         }
 
         if (selectedCells.length > 1) {
-            clearSelection();   // ✅ ADD THIS
+            return; // ✅ DON'T OPEN DROPDOWN
         }
 
-        editCell(cell, cell.dataset.emp, cell.dataset.date);
+        activeCell = cell; // just focus
     });
 
-    table.addEventListener("mousedown", (e) => {
+    newTable.addEventListener("mousedown", (e) => {
 
         const cell = e.target.closest("td");
         if (!cell || !cell.dataset.emp) return;
@@ -339,7 +353,7 @@ function attachEvents() {
         updateSelection(cell);
     });
 
-    table.addEventListener("mouseover", (e) => {
+    newTable.addEventListener("mouseover", (e) => {
         const cell = e.target.closest("td");
         if (!cell || !cell.dataset.emp) return;
 
@@ -347,7 +361,7 @@ function attachEvents() {
         updateSelection(cell);
     });
 
-    table.addEventListener("contextmenu", async (e) => {
+    newTable.addEventListener("contextmenu", async (e) => {
         const cell = e.target.closest("td");
         if (!cell || !cell.dataset.emp) return;
 
@@ -373,7 +387,6 @@ function attachEvents() {
 
         cell.title = comment;
         cell.classList.add("comment-cell");
-        loadAuditLogs();
     });
 
     document.addEventListener("mouseup", (e) => {
@@ -417,6 +430,10 @@ function updateSelection(endCell) {
             if (!cell) continue;
 
             cell.style.outline = "2px solid red";
+            if (!cell.dataset.originalBg) {
+                cell.dataset.originalBg = cell.style.background;
+            } // ✅ store original
+            cell.style.background = "#fff7edcc"; // semi-transparent
 
             selectedCells.push({
                 cell,
@@ -432,86 +449,12 @@ function updateSelection(endCell) {
 function clearSelection() {
     selectedCells.forEach(item => {
         item.cell.style.outline = "none";
+        item.cell.style.background = item.cell.dataset.originalBg || "";
     });
     selectedCells = [];
 }
 
-function editCell(cell, empId, date) {
 
-    if (!localStorage.getItem("token")) {
-        alert("Login required");
-        return;
-    }
-
-    const shifts = ["S1","S2","S3","G","WO","CO","GH","LV"];
-
-    // prevent duplicate dropdown
-    if (cell.querySelector("select")) return;
-
-    let dropdown = document.createElement("select");
-
-    let defaultOption = document.createElement("option");
-    defaultOption.value = "";
-    defaultOption.text = "Select";
-    dropdown.appendChild(defaultOption);
-    dropdown.className = "w-full p-1 border rounded bg-white";
-
-    shifts.forEach(s => {
-        let option = document.createElement("option");
-        option.value = s;
-        option.text = s;
-        dropdown.appendChild(option);
-    });
-
-    const oldValue = cell.innerText.trim();
-
-    cell.innerHTML = "";
-    cell.appendChild(dropdown);
-
-    dropdown.focus();
-
-    dropdown.onchange = async function() {
-
-        const selected = this.value;     
-
-        const res = await fetch(
-            `/roster-entry?employee_id=${empId}&date=${date}&shift_code=${selected}`,
-            {
-                method: "PUT",
-                headers: {
-                    "Authorization": "Bearer " + localStorage.getItem("token")
-                }
-            }
-        );
-
-        if (res.status === 401) {
-            alert("Session expired. Please login again.");
-            localStorage.removeItem("token");
-            loadRoster();
-            return;
-        }
-
-        // preserve comment BEFORE updating UI
-        const existingComment = cell.title;
-
-        // update cell value + color
-        cell.innerHTML = selected;
-        applyColor(cell, selected);
-
-        // restore comment (if exists)
-        if (existingComment) {
-            cell.title = existingComment;
-            cell.classList.add("comment-cell");
-        }
-
-        // 🔥 update summaries
-        updateRowSummary(empId, oldValue, selected);
-        updatePivot(date, oldValue, selected);
-
-        // 🔥 single audit refresh (FIXED)
-        loadAuditLogs();
-    };
-}
 
 function applyColor(cell, shift) {
     let color = "#fff";
@@ -591,13 +534,17 @@ function updatePivot(date, oldShift, newShift) {
         // decrease old shift
         if (shift === oldShift) {
             let val = parseInt(cells[colIndex].innerText);
-            cells[colIndex].innerText = val - 1;
+            let newVal = val - 1;
+            cells[colIndex].innerText = newVal;
+            applyPivotColor(cells[colIndex], newVal); // ✅ ADD THIS
         }
 
         // increase new shift
         if (shift === newShift) {
             let val = parseInt(cells[colIndex].innerText);
-            cells[colIndex].innerText = val + 1;
+            let newVal = val + 1;
+            cells[colIndex].innerText = newVal;
+            applyPivotColor(cells[colIndex], newVal); // ✅ ADD THIS
         }
     });
 
@@ -618,7 +565,9 @@ function updatePivot(date, oldShift, newShift) {
             const s3 = getPivotValue("S3", colIndex);
             const g  = getPivotValue("G", colIndex);
 
-            cells[colIndex].innerText = s1 + s2 + s3 + g;
+            let total = s1 + s2 + s3 + g;
+            cells[colIndex].innerText = total;
+            applyPivotColor(cells[colIndex], total); // ✅ ADD THIS
         }
     }
 
@@ -633,6 +582,19 @@ function updatePivot(date, oldShift, newShift) {
 
         const val = parseInt(row.querySelectorAll("td")[colIndex].innerText);
         return isNaN(val) ? 0 : val;
+    }
+}
+
+function applyPivotColor(cell, val) {
+    if (val > 2) {
+        cell.style.background = "#16a34a";
+        cell.style.color = "white";
+    } else if (val < 2) {
+        cell.style.background = "#fecaca";
+        cell.style.color = "#7f1d1d";
+    } else {
+        cell.style.background = "";
+        cell.style.color = "";
     }
 }
 
@@ -849,7 +811,6 @@ function toggleAudit() {
     } else {
         panel.classList.remove("translate-x-full");
         overlay.classList.remove("hidden");
-        loadAuditLogs();
     }
 
     auditOpen = !auditOpen;
@@ -1120,5 +1081,113 @@ document.addEventListener("click", function (e) {
 
     if (menu && button && !menu.contains(e.target) && e.target !== button) {
         menu.style.display = "none";
+    }
+});
+
+let buffer = "";
+
+document.addEventListener("keydown", async function(e) {
+
+    // 🔹 TARGET CELLS
+    const targets = selectedCells.length > 0
+        ? selectedCells
+        : (activeCell ? [{
+            cell: activeCell,
+            empId: activeCell.dataset.emp,
+            date: activeCell.dataset.date
+        }] : []);
+
+    if (!targets.length) return;
+
+    // =========================
+    // 🔤 TYPING (INLINE EDIT)
+    // =========================
+    if (/^[a-zA-Z0-9]$/.test(e.key)) {
+
+        buffer += e.key.toUpperCase();
+        if (buffer.length > 2) buffer = buffer.slice(-2);
+
+        const valid = ["S1","S2","S3","G","WO","CO","GH","LV"];
+        if (!valid.includes(buffer)) return;
+
+        for (const item of targets) {
+
+            const old = item.cell.innerText.trim() || "-"; // ✅ FIXED
+
+            await fetch(
+                `/roster-entry?employee_id=${item.empId}&date=${item.date}&shift_code=${buffer}`,
+                {
+                    method: "PUT",
+                    headers: {
+                        "Authorization": "Bearer " + localStorage.getItem("token")
+                    }
+                }
+            );
+
+            item.cell.innerHTML = buffer;
+            applyColor(item.cell, buffer);
+
+            updateRowSummary(item.empId, old, buffer);
+            updatePivot(item.date, old, buffer);
+
+            // ✅ VISUAL FEEDBACK
+            item.cell.style.outline = "2px solid green";
+            setTimeout(() => item.cell.style.outline = "none", 200);
+        }
+
+        buffer = "";
+        clearSelection();
+        return; // ✅ IMPORTANT (STOP HERE)
+    }
+
+    // =========================
+    // ⬅️ NAVIGATION
+    // =========================
+
+    if (!activeCell) return;
+
+    if (e.key === "Enter") {
+        e.preventDefault();
+        activeCell.parentElement.nextElementSibling?.cells[activeCell.cellIndex]?.click();
+        return;
+    }
+
+    if (e.key === "Tab") {
+        e.preventDefault();
+        activeCell.parentElement.cells[activeCell.cellIndex + 1]?.click();
+        return;
+    }
+
+    const row = activeCell.parentElement;
+    const table = row.parentElement;
+
+    let r = row.rowIndex;
+    let c = activeCell.cellIndex;
+
+    if (e.key === "ArrowRight") c++;
+    if (e.key === "ArrowLeft") c--;
+    if (e.key === "ArrowDown") r++;
+    if (e.key === "ArrowUp") r--;
+
+    const nextRow = table.rows[r];
+    if (!nextRow) return;
+
+    const nextCell = nextRow.cells[c];
+    if (!nextCell || !nextCell.dataset.emp) return;
+
+    activeCell = nextCell;
+
+    nextCell.scrollIntoView({ block: "nearest", inline: "nearest" });
+    nextCell.style.outline = "2px solid blue";
+
+    setTimeout(() => nextCell.style.outline = "none", 300);
+});
+
+let activeCell = null;
+
+document.addEventListener("click", (e) => {
+    const cell = e.target.closest("td");
+    if (cell && cell.dataset.emp) {
+        activeCell = cell;
     }
 });

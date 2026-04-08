@@ -5,6 +5,14 @@
 
     <!-- ✅ Tailwind CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+    .sidebar.collapsed {
+        width: 70px;
+    }
+    .main.expanded {
+        margin-left: 80px !important;
+    }
+    </style>
 </head>
 
 <body class="bg-gray-100">
@@ -12,7 +20,7 @@
 <div>
 
     <!-- SIDEBAR -->
-    <div class="w-60 bg-white shadow-md h-screen p-4 fixed">
+    <div class="sidebar w-60 bg-white shadow-md h-screen p-4 fixed transition-all duration-300">
 
         <h2 class="text-xl font-bold mb-6 text-indigo-600">📊 NOC Panel</h2>
 
@@ -44,7 +52,12 @@
     </div>
 
     <!-- MAIN CONTENT -->
-    <div class="ml-64 p-6">
+    <div class="main ml-64 p-6 w-full transition-all duration-300">
+
+        <button onclick="toggleSidebar()"
+            class="bg-gray-700 text-white px-3 py-2 rounded hover:bg-gray-800">
+            ☰
+        </button>
 
         <h2 class="text-2xl font-bold mb-4">Employee Management</h2>
 

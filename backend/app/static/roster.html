@@ -3,13 +3,21 @@
 <head>
     <title>Shift Roster</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+    .sidebar.collapsed {
+        width: 70px;
+    }
+    .main.expanded {
+        margin-left: 80px !important;
+    }
+    </style>
 </head>
 <body class="bg-gray-100">
 
-<div class="flex">
+<div>
 
     <!-- 🔥 SIDEBAR -->
-    <div class="w-60 bg-white shadow-md h-screen p-4 fixed">
+    <div class="sidebar w-60 bg-white shadow-md h-screen p-4 fixed transition-all duration-300">
 
         <h2 class="text-xl font-bold mb-6 text-indigo-600">📊 NOC Panel</h2>
 
@@ -41,10 +49,15 @@
     </div>
 
     <!-- 🔥 MAIN CONTENT -->
-    <div class="ml-64 p-6 w-full">
+    <div class="main ml-64 p-6 w-full transition-all duration-300">
 
         <!-- TOP BAR -->
         <div class="flex items-center gap-3 mb-4">
+
+            <button onclick="toggleSidebar()"
+                class="bg-gray-700 text-white px-3 py-2 rounded hover:bg-gray-800">
+                ☰
+            </button>
 
             <select id="monthSelect" class="border px-3 py-2 rounded"></select>
 
@@ -71,29 +84,12 @@
                     class="bg-blue-600 text-white px-3 py-2 rounded hidden">
                 + Create
             </button>
-
-            <button onclick="toggleAudit()"
-                    class="bg-indigo-600 text-white px-3 py-2 rounded">
-                Audit Logs
-            </button>
-
         </div>
 
         <!-- 🔥 TABLE -->
         <div id="rosterTable" class="overflow-auto bg-white p-4 rounded shadow"></div>
 
     </div>
-
-</div>
-
-<!-- 🔥 AUDIT PANEL -->
-<div id="auditOverlay" class="fixed inset-0 bg-black bg-opacity-20 hidden z-40"></div>
-
-<div id="auditPanel"
-     class="fixed right-0 top-0 h-full w-80 bg-white shadow-lg p-4 z-50 transform translate-x-full transition-transform duration-300">
-
-    <h3 class="text-lg font-bold mb-3">Audit Logs</h3>
-    <div id="auditContent"></div>
 
 </div>
 
