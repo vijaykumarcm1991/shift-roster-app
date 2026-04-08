@@ -359,23 +359,6 @@ def roster_summary(date: str, db: Session = Depends(get_db)):
         "summary": sorted(summary.items())
     }
 
-@router.put("/roster/finalize")
-def finalize_roster(month: int, year: int, db: Session = Depends(get_db), user=Depends(verify_token)):
-
-    roster = db.query(Roster).filter(
-        Roster.month == month,
-        Roster.year == year
-    ).order_by(Roster.id.desc()).first()
-
-    if not roster:
-        return {"error": "Roster not found"}
-
-    roster.status = "FINAL"
-
-    db.commit()
-
-    return {"message": "Roster finalized"}
-
 @router.post("/employees")
 def add_employee(
     data: dict,

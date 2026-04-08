@@ -4,8 +4,6 @@ let startCell = null;
 let rosterData = [];
 let datesGlobal = [];
 let dragCompleted = false;
-let historyStack = [];
-let redoStack = [];
 let auditOpen = false;
 
 function initMonthDropdown() {
@@ -93,13 +91,12 @@ async function loadRoster() {
 
     if (!data || !data.length) return;
 
-    // ✅ STATUS
-    const statusLabel = document.getElementById("statusLabel");
-    if (statusLabel) {
-        const rosterStatus = data[0].status || "DRAFT";
-        statusLabel.innerText =
-            rosterStatus === "FINAL" ? "🔒 FINAL" : "✏️ DRAFT";
-    }
+    // // ✅ STATUS
+    // const statusLabel = document.getElementById("statusLabel");
+    // if (statusLabel) {
+    //     const rosterStatus = data[0].status || "DRAFT";
+    //     statusLabel.innerText = "";
+    // }
 
     rosterData = data;
     datesGlobal = Object.keys(data[0].shifts).sort();
@@ -122,16 +119,20 @@ async function loadRoster() {
     for (const team in groups) {
 
         html += `<h3>${team}</h3>`;
-        html += `<table class="min-w-full border border-gray-300 text-sm">`;
+        html += `<table class="border border-gray-300 text-sm border-separate" style="border-spacing:8px;">`;
 
         // 🔹 HEADER
-        html += "<tr><th>Employee</th>";
+        html += `<tr>
+            <th class="px-6 py-4 border border-gray-300 rounded-xl bg-gray-50">
+                Employee
+            </th>`;
 
         dates.forEach(d => {
 
             const dateObj = new Date(d);
 
-            const day = dateObj.toLocaleDateString("en-US", { weekday: "short" });
+            const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+            const day = days[dateObj.getDay()];
             const dateNum = dateObj.getDate();
 
             const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
@@ -145,12 +146,14 @@ async function loadRoster() {
             if (isWeekend) style += "background:#ffecec;";
             if (isToday) style += "background:#4f46e5;color:white;";
 
-            html += `<th style="${style}">
+            html += `<th 
+                        class="px-6 py-4 border border-gray-300 text-center rounded-xl bg-gray-50"
+                        style="${style}; min-width:75px;">
                         <div style="line-height:1.2;">
                             <div style="font-size:11px;">${day}</div>
                             <div style="font-size:13px;font-weight:bold;">${dateNum}</div>
                         </div>
-                     </th>`;
+                    </th>`;
         });
 
         html += `<th style="width:6px;background:#e5e7eb;"></th>`;
@@ -162,7 +165,10 @@ async function loadRoster() {
 
             let counts = { S1:0,S2:0,S3:0,G:0,WO:0,CO:0,GH:0,LV:0 };
 
-            html += `<tr><td>${emp.employee_name}</td>`;
+            html += `<tr>
+                <td class="px-6 py-4 border border-gray-300 rounded-xl whitespace-nowrap font-medium">
+                    ${emp.employee_name}
+                </td>`;
 
             dates.forEach(d => {
 
@@ -194,8 +200,8 @@ async function loadRoster() {
                 if (isWeekend && shift === '-') bgColor = "#fff5f5";
 
                 html += `<td 
-                            class="${comment ? "comment-cell" : ""}" 
-                            style="background:${bgColor}"
+                            class="${comment ? "comment-cell" : ""} px-6 py-4 text-center cursor-pointer border border-gray-300 rounded-xl shadow-sm hover:shadow-md transition"
+                            style="background:${bgColor}; min-width:75px;"
                             data-emp="${emp.employee_id}"
                             data-date="${d}"
                             title="${comment || ""}">
@@ -208,15 +214,15 @@ async function loadRoster() {
             const wd = counts.S1 + counts.S2 + counts.S3 + counts.G;
 
             html += `
-                <td>${counts.S1}</td>
-                <td>${counts.S2}</td>
-                <td>${counts.S3}</td>
-                <td>${counts.G}</td>
-                <td>${counts.WO}</td>
-                <td>${counts.CO}</td>
-                <td>${counts.GH}</td>
-                <td>${counts.LV}</td>
-                <td><b>${wd}</b></td>
+                <td class="px-6 py-4 text-center border border-gray-300 rounded-xl bg-gray-50">${counts.S1}</td>
+                <td class="px-6 py-4 text-center border border-gray-300 rounded-xl bg-gray-50">${counts.S2}</td>
+                <td class="px-6 py-4 text-center border border-gray-300 rounded-xl bg-gray-50">${counts.S3}</td>
+                <td class="px-6 py-4 text-center border border-gray-300 rounded-xl bg-gray-50">${counts.G}</td>
+                <td class="px-6 py-4 text-center border border-gray-300 rounded-xl bg-gray-50">${counts.WO}</td>
+                <td class="px-6 py-4 text-center border border-gray-300 rounded-xl bg-gray-50">${counts.CO}</td>
+                <td class="px-6 py-4 text-center border border-gray-300 rounded-xl bg-gray-50">${counts.GH}</td>
+                <td class="px-6 py-4 text-center border border-gray-300 rounded-xl bg-gray-50">${counts.LV}</td>
+                <td class="px-6 py-4 text-center border border-gray-300 rounded-xl bg-gray-50"><b>${wd}</b></td>
             `;
 
             html += "</tr>";
@@ -226,7 +232,10 @@ async function loadRoster() {
         html += `<tr><td colspan="${dates.length + 11}" style="height:8px;background:#f5f7fb;"></td></tr>`;
 
         // 🔹 SHIFT SUMMARY HEADER (FIXED)
-        html += `<tr><td><b>Shift Summary</b></td>`;
+        html += `<tr>
+            <td class="px-6 py-4 font-bold text-gray-700">
+                Shift Summary
+            </td>`;
         for (let i=0;i<dates.length;i++) html += `<td></td>`;
         html += `<td style="background:#e5e7eb;"></td>`;
         for (let i=0;i<9;i++) html += `<td></td>`;
@@ -251,9 +260,11 @@ async function loadRoster() {
             dates.forEach(d=>{
                 let val = pivot[s][d];
                 let style="";
-                if (val>2) style="background:#28a745;color:white;";
-                else if (val<2) style="background:#dc3545;color:white;";
-                html += `<td style="${style}">${val}</td>`;
+                if (val > 2) style="background:#16a34a;color:white;";
+                else if (val < 2) style="background:#fecaca;color:#7f1d1d;";
+                html += `<td 
+                        class="px-6 py-4 text-center border border-gray-300 rounded-xl"style="${style}">${val}
+                    </td>`;
             });
             html += `<td style="background:#e5e7eb;"></td>`;
             for (let i=0;i<9;i++) html+=`<td></td>`;
@@ -279,105 +290,101 @@ async function loadRoster() {
     attachEvents();
 
     // 🔹 SAFE ROLE UI
-    const undoBtn = document.getElementById("undoBtn");
-    const redoBtn = document.getElementById("redoBtn");
     const logoutBtn = document.getElementById("logoutBtn");
-    const finalizeBtn = document.getElementById("finalizeBtn");
 
     if (!token) {
-        if (undoBtn) undoBtn.style.display = "none";
-        if (redoBtn) redoBtn.style.display = "none";
         if (logoutBtn) logoutBtn.style.display = "none";
         if (loginBox) loginBox.style.display = "block";
-        if (finalizeBtn) finalizeBtn.style.display = "none";
     } else {
-        if (undoBtn) undoBtn.style.display = "inline-block";
-        if (redoBtn) redoBtn.style.display = "inline-block";
         if (logoutBtn) logoutBtn.style.display = "inline-block";
         if (loginBox) loginBox.style.display = "none";
-        if (finalizeBtn) finalizeBtn.style.display = "inline-block";
     }
 }
 
 function attachEvents() {
-    const cells = document.querySelectorAll("#rosterTable td");
 
-    cells.forEach(cell => {
+    const table = document.getElementById("rosterTable");
 
-        cell.addEventListener("mousedown", (e) => {
-            if (!localStorage.getItem("token")) return;
-            if (e.button !== 0) return;
+    // ✅ PREVENT DUPLICATE EVENT BINDING
+    if (table.dataset.eventsAttached === "true") return;
+    table.dataset.eventsAttached = "true";
 
-            isDragging = true;
-            startCell = cell;
-            updateSelection(cell);
-        });
+    // 🔥 EVENT DELEGATION (FIX)
+    table.addEventListener("click", (e) => {
 
-        cell.addEventListener("mouseenter", () => {
-            if (!isDragging) return;
-            updateSelection(cell);
-        });
+        const cell = e.target.closest("td");
+        if (!cell || !cell.dataset.emp) return;
 
-        cell.addEventListener("click", () => {
+        if (dragCompleted) {
+            dragCompleted = false;
+        }
 
-            // ✅ MAIN FIX: block click right after drag
-            if (dragCompleted) {
-                dragCompleted = false;
-                return;
+        if (selectedCells.length > 1) {
+            clearSelection();   // ✅ ADD THIS
+        }
+
+        editCell(cell, cell.dataset.emp, cell.dataset.date);
+    });
+
+    table.addEventListener("mousedown", (e) => {
+
+        const cell = e.target.closest("td");
+        if (!cell || !cell.dataset.emp) return;
+
+        if (!localStorage.getItem("token")) return;
+        if (e.button !== 0) return;
+
+        isDragging = true;
+        startCell = cell;
+        updateSelection(cell);
+    });
+
+    table.addEventListener("mouseover", (e) => {
+        const cell = e.target.closest("td");
+        if (!cell || !cell.dataset.emp) return;
+
+        if (!isDragging) return;
+        updateSelection(cell);
+    });
+
+    table.addEventListener("contextmenu", async (e) => {
+        const cell = e.target.closest("td");
+        if (!cell || !cell.dataset.emp) return;
+
+        e.preventDefault();
+
+        if (!localStorage.getItem("token")) {
+            alert("Login required");
+            return;
+        }
+
+        const empId = cell.dataset.emp;
+        const date = cell.dataset.date;
+
+        const comment = prompt("Enter comment:");
+        if (comment === null) return;
+
+        await fetch(`/roster-entry/comment?employee_id=${empId}&date=${date}&comment=${encodeURIComponent(comment)}`, {
+            method: "PUT",
+            headers: {
+                "Authorization": "Bearer " + localStorage.getItem("token")
             }
-
-            // existing condition
-            if (selectedCells.length > 1) return;
-
-            editCell(cell, cell.dataset.emp, cell.dataset.date);
         });
 
-        cell.addEventListener("contextmenu", async (e) => {
-            e.preventDefault();
-
-            if (!localStorage.getItem("token")) {
-                alert("Login required");
-                return;
-            }
-
-            const empId = cell.dataset.emp;
-            const date = cell.dataset.date;
-
-            const comment = prompt("Enter comment:");
-
-            if (comment === null) return;
-
-            await fetch(`/roster-entry/comment?employee_id=${empId}&date=${date}&comment=${encodeURIComponent(comment)}`, {
-                method: "PUT",
-                headers: {
-                    "Authorization": "Bearer " + localStorage.getItem("token")
-                }
-            });
-
-            cell.title = comment;
-            cell.classList.add("comment-cell");
-            loadAuditLogs();
-        });
-
+        cell.title = comment;
+        cell.classList.add("comment-cell");
+        loadAuditLogs();
     });
 
     document.addEventListener("mouseup", (e) => {
         if (!isDragging) return;
 
         isDragging = false;
-        dragCompleted = true; // ✅ IMPORTANT
-        // 🔥 BONUS: safety reset (prevents stuck state)
+        dragCompleted = true;
+
         setTimeout(() => {
             dragCompleted = false;
         }, 100);
-
-        if (selectedCells.length === 0) return;
-
-        const dropdown = document.getElementById("bulkDropdown");
-
-        dropdown.style.display = "block";
-        dropdown.style.left = e.pageX + "px";
-        dropdown.style.top = e.pageY + "px";
     });
 }
 
@@ -430,6 +437,7 @@ function clearSelection() {
 }
 
 function editCell(cell, empId, date) {
+
     if (!localStorage.getItem("token")) {
         alert("Login required");
         return;
@@ -446,6 +454,7 @@ function editCell(cell, empId, date) {
     defaultOption.value = "";
     defaultOption.text = "Select";
     dropdown.appendChild(defaultOption);
+    dropdown.className = "w-full p-1 border rounded bg-white";
 
     shifts.forEach(s => {
         let option = document.createElement("option");
@@ -454,6 +463,8 @@ function editCell(cell, empId, date) {
         dropdown.appendChild(option);
     });
 
+    const oldValue = cell.innerText.trim();
+
     cell.innerHTML = "";
     cell.appendChild(dropdown);
 
@@ -461,19 +472,7 @@ function editCell(cell, empId, date) {
 
     dropdown.onchange = async function() {
 
-        const selected = this.value;
-        const oldValue = cell.innerText.trim();
-
-        // ✅ SAVE HISTORY
-        historyStack.push({
-            empId,
-            date,
-            oldValue,
-            newValue: selected
-        });
-
-        // clear redo stack
-        redoStack = [];
+        const selected = this.value;     
 
         const res = await fetch(
             `/roster-entry?employee_id=${empId}&date=${date}&shift_code=${selected}`,
@@ -637,61 +636,6 @@ function updatePivot(date, oldShift, newShift) {
     }
 }
 
-function undoLastChange() {
-
-    if (historyStack.length === 0) {
-        alert("Nothing to undo");
-        return;
-    }
-
-    const last = historyStack.pop();
-
-    redoStack.push(last);
-
-    const { empId, date, oldValue, newValue } = last;
-
-    const cell = document.querySelector(
-        `[data-emp="${empId}"][data-date="${date}"]`
-    );
-
-    if (!cell) return;
-
-    // revert UI
-    cell.innerHTML = oldValue;
-    applyColor(cell, oldValue);
-
-    // 🔥 update summaries
-    updateRowSummary(empId, newValue, oldValue);
-    updatePivot(date, newValue, oldValue);
-}
-
-function redoLastChange() {
-
-    if (redoStack.length === 0) {
-        alert("Nothing to redo");
-        return;
-    }
-
-    const last = redoStack.pop();
-
-    // move back to history
-    historyStack.push(last);
-
-    const { empId, date, oldValue, newValue } = last;
-
-    const cell = document.querySelector(
-        `[data-emp="${empId}"][data-date="${date}"]`
-    );
-
-    if (!cell) return;
-
-    cell.innerHTML = newValue;
-    applyColor(cell, newValue);
-
-    updateRowSummary(empId, oldValue, newValue);
-    updatePivot(date, oldValue, newValue);
-}
-
 function reloadRoster() {
 
     const today = new Date();
@@ -705,28 +649,6 @@ function reloadRoster() {
 function logout() {
     localStorage.removeItem("token");
     window.location.href = "/static/roster.html";
-}
-
-async function finalizeRoster() {
-
-    const month = document.getElementById("monthSelect").value;
-    const year = document.getElementById("yearSelect").value;
-
-    const res = await fetch(`/roster/finalize?month=${month}&year=${year}`, {
-        method: "PUT",
-        headers: {
-            "Authorization": "Bearer " + localStorage.getItem("token")
-        }
-    });
-
-    if (res.status !== 200) {
-        alert("Failed to finalize");
-        return;
-    }
-
-    alert("Roster finalized");
-
-    loadRoster();
 }
 
 async function createRoster() {
@@ -863,22 +785,23 @@ async function deleteAdmin() {
 
 function applyRoleUI() {
     const token = localStorage.getItem("token");
+    const user = getUserFromToken();    
 
     const adminSection = document.getElementById("adminSection");
-    const createBtn = document.querySelector("button[onclick='createRoster()']");
-    const addBtn = document.querySelector("button[onclick='showAddEmployee()']");
-    const delBtn = document.querySelector("button[onclick='deleteEmployee()']");
+    const createBtn = document.getElementById("createRosterBtn");
+    const addBtn = document.getElementById("addEmployeeBtn");
+    const delBtn = document.getElementById("deleteEmployeeBtn");
 
     if (!token) {
         if (adminSection) adminSection.style.display = "none";
-        if (createBtn) createBtn.style.display = "none";
-        if (addBtn) addBtn.style.display = "none";
-        if (delBtn) delBtn.style.display = "none";
     } else {
-        if (adminSection) adminSection.style.display = "block";
-        if (createBtn) createBtn.style.display = "inline-block";
-        if (addBtn) addBtn.style.display = "inline-block";
-        if (delBtn) delBtn.style.display = "inline-block";
+        if (user?.role === "admin") {
+            if (adminSection) adminSection.style.display = "block";
+            if (createBtn) createBtn.style.display = "inline-block";
+        } else {
+            if (adminSection) adminSection.style.display = "none";
+            if (createBtn) createBtn.style.display = "none";
+        }
     }
 }
 
@@ -1144,7 +1067,11 @@ function initSidebar(page) {
         if (logoutBtn) logoutBtn.style.display = "block";
 
         if (userLabel) {
-            userLabel.innerText = "👤 Logged In";
+            const user = getUserFromToken();
+
+            userLabel.innerText = user?.username
+                ? `👤 ${user.username}`
+                : "👤 User";
             userLabel.style.display = "block";
         }
     } else {
@@ -1152,6 +1079,17 @@ function initSidebar(page) {
         if (logoutBtn) logoutBtn.style.display = "none";
 
         if (userLabel) userLabel.style.display = "none";
+    }
+}
+
+function getUserFromToken() {
+    const token = localStorage.getItem("token");
+    if (!token) return null;
+
+    try {
+        return JSON.parse(atob(token.split('.')[1]));
+    } catch {
+        return null;
     }
 }
 
@@ -1174,21 +1112,6 @@ document.addEventListener("DOMContentLoaded", function () {
     if (document.getElementById("rosterTable")) loadRoster();
     if (document.getElementById("employeeList")) loadEmployees();
     if (document.getElementById("adminList")) loadAdmins();
-});
-
-// ✅ ADD THIS BELOW
-document.addEventListener("keydown", (e) => {
-    if (e.ctrlKey && e.key === "z") {
-        e.preventDefault();
-        undoLastChange();
-    }
-
-    // ✅ ADD THIS
-    if (e.ctrlKey && e.key === "y") {
-        e.preventDefault();
-        redoLastChange();
-    }
-
 });
 
 document.addEventListener("click", function (e) {

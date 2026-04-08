@@ -66,19 +66,10 @@
         <!-- ACTION BAR -->
         <div class="flex gap-2 mb-4">
 
-            <button onclick="undoLastChange()"
-                    class="bg-gray-600 text-white px-3 py-2 rounded">
-                Undo
-            </button>
-
-            <button onclick="redoLastChange()"
-                    class="bg-gray-600 text-white px-3 py-2 rounded">
-                Redo
-            </button>
-
-            <button onclick="finalizeRoster()"
-                    class="bg-green-600 text-white px-3 py-2 rounded">
-                Finalize
+            <button onclick="createRoster()"
+                    id="createRosterBtn"
+                    class="bg-blue-600 text-white px-3 py-2 rounded hidden">
+                + Create
             </button>
 
             <button onclick="toggleAudit()"
