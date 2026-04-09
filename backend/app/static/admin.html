@@ -6,11 +6,8 @@
     <!-- Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-    .sidebar.collapsed {
-        width: 70px;
-    }
-    .main.expanded {
-        margin-left: 80px !important;
+    .sidebar {
+        z-index: 50;
     }
     </style>
 </head>
@@ -20,18 +17,21 @@
 <div>
 
     <!-- SIDEBAR (LIGHT THEME) -->
-    <div class="sidebar w-60 bg-white shadow-md h-screen p-4 fixed transition-all duration-300">
+    <div class="sidebar w-60 bg-white shadow-md h-screen p-4 fixed transition-all duration-300 overflow-hidden">
 
-        <h2 class="text-xl font-bold mb-6 text-indigo-600">📊 NOC Panel</h2>
+        <div class="flex flex-col items-center mb-6">
+            <img src="/static/onmobile.png" class="h-10 w-auto object-contain mb-2">
+            <h2 class="text-xl font-bold text-indigo-600">📊 NOC Panel</h2>
+        </div>
 
         <div class="space-y-2">
-            <button id="navRoster" onclick="location.href='roster.html'" class="w-full text-left px-3 py-2 rounded hover:bg-gray-200">📅 Roster</button>
+            <button id="navRoster" onclick="location.href='roster.html'" class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-200"><span>📅</span><span>Roster</span></button>
 
-            <button id="navReports" onclick="location.href='reports.html'" class="w-full text-left px-3 py-2 rounded hover:bg-gray-200">📊 Reports</button>
+            <button id="navReports" onclick="location.href='reports.html'" class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-200"><span>📊</span><span>Reports</span></button>
 
-            <button id="navEmployees" onclick="location.href='employees.html'" class="w-full text-left px-3 py-2 rounded hover:bg-gray-200">👥 Employees</button>
+            <button id="navEmployees" onclick="location.href='employees.html'" class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-200"><span>👥</span><span>Employees</span></button>
 
-            <button id="navAdmin" onclick="location.href='admin.html'" class="w-full text-left px-3 py-2 rounded hover:bg-gray-200">🛠 Admin</button>
+            <button id="navAdmin" onclick="location.href='admin.html'" class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-200"><span>🛠</span><span>Admin</span></button>
         </div>
 
         <hr class="my-4">
@@ -53,11 +53,6 @@
 
     <!-- MAIN -->
     <div class="main ml-64 p-6 w-full transition-all duration-300">
-
-        <button onclick="toggleSidebar()"
-            class="bg-gray-700 text-white px-3 py-2 rounded hover:bg-gray-800">
-            ☰
-        </button>
 
         <h2 class="text-2xl font-bold mb-4">Admin Management</h2>
 

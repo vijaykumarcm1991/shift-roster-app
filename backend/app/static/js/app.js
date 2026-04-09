@@ -4,7 +4,6 @@ let startCell = null;
 let rosterData = [];
 let datesGlobal = [];
 let dragCompleted = false;
-let auditOpen = false;
 
 function initMonthDropdown() {
     const monthSelect = document.getElementById("monthSelect");
@@ -147,7 +146,7 @@ async function loadRoster() {
             if (isToday) style += "background:#4f46e5;color:white;";
 
             html += `<th 
-                        class="px-6 py-4 sticky top-0 bg-gray-100 z-10 border border-gray-300 text-center rounded-xl bg-gray-50"
+                        class="px-6 py-4 sticky top-0 bg-gray-100 z-[1] border border-gray-300 text-center rounded-xl bg-gray-50"
                         style="${style}; min-width:75px;">
                         <div style="line-height:1.2;">
                             <div style="font-size:11px;">${day}</div>
@@ -176,7 +175,7 @@ async function loadRoster() {
             let counts = { S1:0,S2:0,S3:0,G:0,WO:0,CO:0,GH:0,LV:0 };
 
             html += `<tr>
-                <td class="px-6 py-4 sticky left-0 bg-white z-10 border border-gray-300 rounded-xl whitespace-nowrap font-medium">
+                <td class="px-6 py-4 sticky left-0 bg-white z-[1] border border-gray-300 rounded-xl whitespace-nowrap font-medium">
                     ${emp.employee_name}
                 </td>`;
 
@@ -299,6 +298,25 @@ async function loadRoster() {
 
     const tableEl = document.getElementById("rosterTable");
     if (tableEl) tableEl.innerHTML = html;
+
+    // 🔥 AUTO SCROLL TO CURRENT DAY
+    setTimeout(() => {
+
+        const today = new Date();
+
+        const todayStr = today.toISOString().split("T")[0];
+
+        const todayCell = document.querySelector(`[data-date="${todayStr}"]`);
+
+        if (todayCell) {
+            todayCell.scrollIntoView({
+                behavior: "smooth",
+                inline: "center",
+                block: "nearest"
+            });
+        }
+
+    }, 200);
 
     attachEvents();
 
@@ -798,37 +816,6 @@ async function loadAuditLogs() {
     });
 
     document.getElementById("auditContent").innerHTML = html;
-}
-
-function toggleAudit() {
-
-    const panel = document.getElementById("auditPanel");
-    const overlay = document.getElementById("auditOverlay");
-
-    if (auditOpen) {
-        panel.classList.add("translate-x-full");
-        overlay.classList.add("hidden");
-    } else {
-        panel.classList.remove("translate-x-full");
-        overlay.classList.remove("hidden");
-    }
-
-    auditOpen = !auditOpen;
-}
-
-document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && auditOpen) {
-        toggleAudit();
-    }
-});
-
-function toggleSidebar() {
-
-    const sidebar = document.querySelector(".sidebar");
-    const main = document.querySelector(".main");
-
-    sidebar.classList.toggle("collapsed");
-    main.classList.toggle("expanded");
 }
 
 async function loadEmployees() {
