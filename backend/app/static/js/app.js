@@ -407,20 +407,67 @@ function attachEvents() {
         cell.classList.add("comment-cell");
     });
 
-    document.addEventListener("mouseup", (e) => {
+    document.addEventListener("mouseup", async (e) => {
         if (!isDragging) return;
 
         isDragging = false;
         dragCompleted = true;
 
+        // 🔥 AUTO-FILL LOGIC
+        if (
+            selectedCells.length > 1 &&
+            window.selectionPattern &&
+            window.selectionPattern.length > 0
+        ) {
+            const pattern = window.selectionPattern;
+
+            for (let i = 0; i < selectedCells.length; i++) {
+
+                const item = selectedCells[i];
+                let shift = pattern[i % pattern.length];
+
+                if (shift === "-") continue; // ❌ skip empty cells
+
+                const old = item.cell.innerText.trim() || "-";
+
+                // 🔹 API CALL
+                await fetch(
+                    `/roster-entry?employee_id=${item.empId}&date=${item.date}&shift_code=${shift}`,
+                    {
+                        method: "PUT",
+                        headers: {
+                            "Authorization": "Bearer " + localStorage.getItem("token")
+                        }
+                    }
+                );
+
+                // 🔹 UI UPDATE
+                item.cell.innerHTML = shift;
+                applyColor(item.cell, shift);
+
+                updateRowSummary(item.empId, old, shift);
+                updatePivot(item.date, old, shift);
+
+                // 🔹 visual feedback
+                item.cell.style.outline = "2px solid green";
+                setTimeout(() => item.cell.style.outline = "none", 200);
+            }
+        }
+
         setTimeout(() => {
             dragCompleted = false;
         }, 100);
+
+        clearSelection();
     });
 }
 
 function updateSelection(endCell) {
+    
     clearSelection();
+
+    // reset pattern each new drag
+    window.selectionPattern = [];
 
     const table = endCell.closest("table");
     const rows = Array.from(table.querySelectorAll("tr")).slice(1);
@@ -462,6 +509,21 @@ function updateSelection(endCell) {
     }
 
     console.log("Selected:", selectedCells.length);
+
+    // 🔥 detect direction
+    const isHorizontal = Math.abs(endCol - startCol) > Math.abs(endRow - startRow);
+
+    if (isHorizontal) {
+        // 👉 LEFT → RIGHT → use FIRST COLUMN
+        window.selectionPattern = selectedCells
+            .filter(c => c.cell.cellIndex === startCol)
+            .map(c => c.cell.innerText.trim() || "-");
+    } else {
+        // 👉 TOP → DOWN → use FIRST ROW
+        window.selectionPattern = selectedCells
+            .filter(c => c.cell.parentElement.rowIndex - 1 === startRow)
+            .map(c => c.cell.innerText.trim() || "-");
+    }
 }
 
 function clearSelection() {
