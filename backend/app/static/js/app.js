@@ -4,6 +4,7 @@ let startCell = null;
 let rosterData = [];
 let datesGlobal = [];
 let dragCompleted = false;
+let copiedCells = [];
 
 function initMonthDropdown() {
     const monthSelect = document.getElementById("monthSelect");
@@ -366,8 +367,18 @@ function attachEvents() {
         if (!localStorage.getItem("token")) return;
         if (e.button !== 0) return;
 
+        // 🔥 NORMAL SELECTION (always allowed)
         isDragging = true;
         startCell = cell;
+        window.selectionPattern = [];
+
+        // 🔥 HANDLE MODE (for autofill)
+        if (e.target.classList.contains("drag-handle")) {
+            window.isHandleDrag = true;
+        } else {
+            window.isHandleDrag = false;
+        }
+
         updateSelection(cell);
     });
 
@@ -413,24 +424,29 @@ function attachEvents() {
         isDragging = false;
         dragCompleted = true;
 
-        // 🔥 AUTO-FILL LOGIC
         if (
+            window.isHandleDrag &&
             selectedCells.length > 1 &&
             window.selectionPattern &&
             window.selectionPattern.length > 0
         ) {
+
+            // 🔥 REMOVE PREVIEW EFFECT
+            selectedCells.forEach(item => {
+                item.cell.style.opacity = "1";
+            });
+
             const pattern = window.selectionPattern;
 
             for (let i = 0; i < selectedCells.length; i++) {
 
                 const item = selectedCells[i];
-                let shift = pattern[i % pattern.length];
+                const shift = pattern[i % pattern.length];
 
-                if (shift === "-") continue; // ❌ skip empty cells
+                if (shift === "-") continue;
 
-                const old = item.cell.innerText.trim() || "-";
+                const old = item.cell.dataset.originalValue || "-";
 
-                // 🔹 API CALL
                 await fetch(
                     `/roster-entry?employee_id=${item.empId}&date=${item.date}&shift_code=${shift}`,
                     {
@@ -441,33 +457,35 @@ function attachEvents() {
                     }
                 );
 
-                // 🔹 UI UPDATE
-                item.cell.innerHTML = shift;
+                item.cell.innerText = shift;
                 applyColor(item.cell, shift);
 
                 updateRowSummary(item.empId, old, shift);
                 updatePivot(item.date, old, shift);
 
-                // 🔹 visual feedback
                 item.cell.style.outline = "2px solid green";
                 setTimeout(() => item.cell.style.outline = "none", 200);
             }
+
+            // 🔥 CLEAN ORIGINAL VALUE CACHE
+            selectedCells.forEach(item => {
+                delete item.cell.dataset.originalValue;
+            });
         }
 
         setTimeout(() => {
             dragCompleted = false;
         }, 100);
+        
+        console.log("Applying shift:", shift);
 
         clearSelection();
     });
 }
 
 function updateSelection(endCell) {
-    
-    clearSelection();
 
-    // reset pattern each new drag
-    window.selectionPattern = [];
+    clearSelection();
 
     const table = endCell.closest("table");
     const rows = Array.from(table.querySelectorAll("tr")).slice(1);
@@ -485,6 +503,7 @@ function updateSelection(endCell) {
 
     selectedCells = [];
 
+    // 🔥 STEP 1: COLLECT CELLS FIRST (NO PREVIEW)
     for (let r = minRow; r <= maxRow; r++) {
         const row = rows[r];
 
@@ -494,11 +513,16 @@ function updateSelection(endCell) {
             const cell = row.cells[c];
             if (!cell) continue;
 
-            cell.style.outline = "2px solid red";
             if (!cell.dataset.originalBg) {
                 cell.dataset.originalBg = cell.style.background;
-            } // ✅ store original
-            cell.style.background = "#fff7edcc"; // semi-transparent
+            }
+
+            if (!cell.dataset.originalValue) {
+                cell.dataset.originalValue = cell.innerText.trim();
+            }
+
+            cell.style.outline = "2px solid red";
+            cell.style.background = "#fff7edcc";
 
             selectedCells.push({
                 cell,
@@ -508,21 +532,54 @@ function updateSelection(endCell) {
         }
     }
 
-    console.log("Selected:", selectedCells.length);
+    // 🔥 STEP 2: BUILD PATTERN (BEFORE PREVIEW)
+    // 🔥 BUILD PATTERN ONLY ON FIRST DRAG (FIX)
+    if (!window.selectionPattern || window.selectionPattern.length === 0) {
 
-    // 🔥 detect direction
-    const isHorizontal = Math.abs(endCol - startCol) > Math.abs(endRow - startRow);
+        const isHorizontal = Math.abs(endCol - startCol) > Math.abs(endRow - startRow);
 
-    if (isHorizontal) {
-        // 👉 LEFT → RIGHT → use FIRST COLUMN
-        window.selectionPattern = selectedCells
-            .filter(c => c.cell.cellIndex === startCol)
-            .map(c => c.cell.innerText.trim() || "-");
-    } else {
-        // 👉 TOP → DOWN → use FIRST ROW
-        window.selectionPattern = selectedCells
-            .filter(c => c.cell.parentElement.rowIndex - 1 === startRow)
-            .map(c => c.cell.innerText.trim() || "-");
+        if (isHorizontal) {
+            window.selectionPattern = selectedCells
+                .filter(c => c.cell.cellIndex === startCol)
+                .map(c => c.cell.dataset.originalValue || "-");
+        } else {
+            window.selectionPattern = selectedCells
+                .filter(c => c.cell.parentElement.rowIndex - 1 === startRow)
+                .map(c => c.cell.dataset.originalValue || "-");
+        }
+    }
+
+    // 🔥 STEP 3: APPLY PREVIEW (AFTER PATTERN)
+    if (window.selectionPattern && window.selectionPattern.length > 0) {
+
+        selectedCells.forEach((item, index) => {
+
+            const previewVal = window.selectionPattern[index % window.selectionPattern.length];
+
+            if (previewVal !== "-") {
+                item.cell.innerText = previewVal;
+                item.cell.style.opacity = "0.6";
+            }
+        });
+    }
+
+    // 🔥 STEP 4: ADD DRAG HANDLE
+    const last = selectedCells[selectedCells.length - 1];
+
+    if (last) {
+        const handle = document.createElement("div");
+
+        handle.style.position = "absolute";
+        handle.style.width = "8px";
+        handle.style.height = "8px";
+        handle.style.background = "#2563eb";
+        handle.style.right = "2px";
+        handle.style.bottom = "2px";
+        handle.style.cursor = "crosshair";
+        handle.classList.add("drag-handle");
+
+        last.cell.style.position = "relative";
+        last.cell.appendChild(handle);
     }
 }
 
@@ -531,10 +588,12 @@ function clearSelection() {
         item.cell.style.outline = "none";
         item.cell.style.background = item.cell.dataset.originalBg || "";
     });
+
+    // 🔥 REMOVE OLD HANDLES (ADD HERE)
+    document.querySelectorAll(".drag-handle").forEach(el => el.remove());
+
     selectedCells = [];
 }
-
-
 
 function applyColor(cell, shift) {
     let color = "#fff";
@@ -1147,6 +1206,65 @@ document.addEventListener("keydown", async function(e) {
         }] : []);
 
     if (!targets.length) return;
+
+    // 🔥 COPY
+    if (e.ctrlKey && e.key === "c") {
+
+        copiedCells = selectedCells.map(item => ({
+            value: item.cell.innerText.trim() || "-"
+        }));
+
+        console.log("Copied:", copiedCells);
+        return;
+    }
+
+    // 🔥 PASTE
+    if (e.ctrlKey && e.key === "v") {
+
+        if (!copiedCells.length) return;
+
+        const targets = selectedCells.length > 0
+            ? selectedCells
+            : (activeCell ? [{
+                cell: activeCell,
+                empId: activeCell.dataset.emp,
+                date: activeCell.dataset.date
+            }] : []);
+
+        if (!targets.length) return;
+
+        for (let i = 0; i < targets.length; i++) {
+
+            const item = targets[i];
+            const val = copiedCells[i % copiedCells.length].value;
+
+            if (val === "-") continue;
+
+            const old = item.cell.innerText.trim() || "-";
+
+            await fetch(
+                `/roster-entry?employee_id=${item.empId}&date=${item.date}&shift_code=${val}`,
+                {
+                    method: "PUT",
+                    headers: {
+                        "Authorization": "Bearer " + localStorage.getItem("token")
+                    }
+                }
+            );
+
+            item.cell.innerHTML = val;
+            applyColor(item.cell, val);
+
+            updateRowSummary(item.empId, old, val);
+            updatePivot(item.date, old, val);
+
+            item.cell.style.outline = "2px solid blue";
+            setTimeout(() => item.cell.style.outline = "none", 200);
+        }
+
+        clearSelection();
+        return;
+    }
 
     // =========================
     // 🔤 TYPING (INLINE EDIT)
