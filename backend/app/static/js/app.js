@@ -5,6 +5,8 @@ let rosterData = [];
 let datesGlobal = [];
 let dragCompleted = false;
 let copiedCells = [];
+let undoStack = [];
+let redoStack = [];
 
 function initMonthDropdown() {
     const monthSelect = document.getElementById("monthSelect");
@@ -425,7 +427,6 @@ function attachEvents() {
         dragCompleted = true;
 
         if (
-            window.isHandleDrag &&
             selectedCells.length > 1 &&
             window.selectionPattern &&
             window.selectionPattern.length > 0
@@ -447,8 +448,17 @@ function attachEvents() {
 
                 const old = item.cell.dataset.originalValue || "-";
 
-                await fetch(
-                    `/roster-entry?employee_id=${item.empId}&date=${item.date}&shift_code=${shift}`,
+                // 🔥 ADD HERE (CORRECT)
+                undoStack.push({
+                    empId: item.empId,
+                    date: item.date,
+                    old: old,
+                    new: shift
+                });
+                redoStack = [];
+
+                const res = await fetch(
+                    `/roster-entry?employee_id=${item.empId}&date=${item.date}&shift_code=${shift === "-" ? "" : shift}`,
                     {
                         method: "PUT",
                         headers: {
@@ -456,6 +466,11 @@ function attachEvents() {
                         }
                     }
                 );
+
+                if (!res.ok) {
+                    console.error("Update failed", await res.text());
+                    return;
+                }
 
                 item.cell.innerText = shift;
                 applyColor(item.cell, shift);
@@ -476,8 +491,6 @@ function attachEvents() {
         setTimeout(() => {
             dragCompleted = false;
         }, 100);
-        
-        console.log("Applying shift:", shift);
 
         clearSelection();
     });
@@ -587,9 +600,10 @@ function clearSelection() {
     selectedCells.forEach(item => {
         item.cell.style.outline = "none";
         item.cell.style.background = item.cell.dataset.originalBg || "";
+        item.cell.style.opacity = "1"; // 🔥 FIX
+        delete item.cell.dataset.originalValue; // 🔥 FIX
     });
 
-    // 🔥 REMOVE OLD HANDLES (ADD HERE)
     document.querySelectorAll(".drag-handle").forEach(el => el.remove());
 
     selectedCells = [];
@@ -893,16 +907,28 @@ function applyRoleUI() {
     const addBtn = document.getElementById("addEmployeeBtn");
     const delBtn = document.getElementById("deleteEmployeeBtn");
 
-    if (!token) {
+    // 🔒 NOT LOGGED IN → HIDE EVERYTHING
+    if (!token || !user) {
         if (adminSection) adminSection.style.display = "none";
-    } else {
-        if (user?.role === "admin") {
-            if (adminSection) adminSection.style.display = "block";
-            if (createBtn) createBtn.style.display = "inline-block";
-        } else {
-            if (adminSection) adminSection.style.display = "none";
-            if (createBtn) createBtn.style.display = "none";
-        }
+        if (createBtn) createBtn.style.display = "none";
+        if (addBtn) addBtn.style.display = "none";
+        if (delBtn) delBtn.style.display = "none";
+        return;
+    }
+
+    // 🔐 ADMIN ACCESS
+    if (user.role === "admin") {
+        if (adminSection) adminSection.style.display = "block";
+        if (createBtn) createBtn.style.display = "inline-block";
+        if (addBtn) addBtn.style.display = "inline-block";
+        if (delBtn) delBtn.style.display = "inline-block";
+    } 
+    // 👤 NON-ADMIN
+    else {
+        if (adminSection) adminSection.style.display = "none";
+        if (createBtn) createBtn.style.display = "none";
+        if (addBtn) addBtn.style.display = "none";
+        if (delBtn) delBtn.style.display = "none";
     }
 }
 
@@ -1197,20 +1223,27 @@ let buffer = "";
 document.addEventListener("keydown", async function(e) {
 
     // 🔹 TARGET CELLS
-    const targets = selectedCells.length > 0
-        ? selectedCells
-        : (activeCell ? [{
+    let targets = [];
+
+    if (selectedCells.length > 0) {
+        targets = selectedCells;
+    } else if (activeCell && activeCell.dataset.emp) {
+        targets = [{
             cell: activeCell,
             empId: activeCell.dataset.emp,
             date: activeCell.dataset.date
-        }] : []);
+        }];
+    }
 
-    if (!targets.length) return;
+    // ❗ ONLY block if truly nothing selected
+    if (targets.length === 0) return;
 
     // 🔥 COPY
     if (e.ctrlKey && e.key === "c") {
 
-        copiedCells = selectedCells.map(item => ({
+        e.preventDefault();
+
+        copiedCells = targets.map(item => ({
             value: item.cell.innerText.trim() || "-"
         }));
 
@@ -1220,6 +1253,8 @@ document.addEventListener("keydown", async function(e) {
 
     // 🔥 PASTE
     if (e.ctrlKey && e.key === "v") {
+
+        e.preventDefault();
 
         if (!copiedCells.length) return;
 
@@ -1242,7 +1277,16 @@ document.addEventListener("keydown", async function(e) {
 
             const old = item.cell.innerText.trim() || "-";
 
-            await fetch(
+            undoStack.push({
+                empId: item.empId,
+                date: item.date,
+                old: old,
+                new: val // or buffer/val
+            });
+
+            redoStack = []; // clear redo on new action
+
+            const res = await fetch(
                 `/roster-entry?employee_id=${item.empId}&date=${item.date}&shift_code=${val}`,
                 {
                     method: "PUT",
@@ -1252,6 +1296,11 @@ document.addEventListener("keydown", async function(e) {
                 }
             );
 
+            if (!res.ok) {
+                console.error("Paste failed", await res.text());
+                return;
+            }
+
             item.cell.innerHTML = val;
             applyColor(item.cell, val);
 
@@ -1260,6 +1309,47 @@ document.addEventListener("keydown", async function(e) {
 
             item.cell.style.outline = "2px solid blue";
             setTimeout(() => item.cell.style.outline = "none", 200);
+        }
+
+        clearSelection();
+        return;
+    }
+
+    // 🔥 DELETE CELL (CLEAR SHIFT)
+    if (e.key === "Delete" || e.key === "Backspace") {
+
+        for (const item of targets) {
+
+            const old = item.cell.innerText.trim() || "-";
+
+            undoStack.push({
+                empId: item.empId,
+                date: item.date,
+                old: old,
+                new: "-"
+            });
+            redoStack = [];
+
+            const res = await fetch(
+                `/roster-entry?employee_id=${item.empId}&date=${item.date}&shift_code=`,
+                {
+                    method: "PUT",
+                    headers: {
+                        "Authorization": "Bearer " + localStorage.getItem("token")
+                    }
+                }
+            );
+
+            if (!res.ok) {
+                console.error("Delete failed", await res.text());
+                return;
+            }
+
+            item.cell.innerHTML = "-";
+            applyColor(item.cell, "-");
+
+            updateRowSummary(item.empId, old, "-");
+            updatePivot(item.date, old, "-");
         }
 
         clearSelection();
@@ -1281,7 +1371,16 @@ document.addEventListener("keydown", async function(e) {
 
             const old = item.cell.innerText.trim() || "-"; // ✅ FIXED
 
-            await fetch(
+            undoStack.push({
+                empId: item.empId,
+                date: item.date,
+                old: old,
+                new: buffer // or buffer/val
+            });
+
+            redoStack = []; // clear redo on new action
+
+            const res = await fetch(
                 `/roster-entry?employee_id=${item.empId}&date=${item.date}&shift_code=${buffer}`,
                 {
                     method: "PUT",
@@ -1290,6 +1389,11 @@ document.addEventListener("keydown", async function(e) {
                     }
                 }
             );
+
+            if (!res.ok) {
+                console.error("Typing update failed", await res.text());
+                return;
+            }
 
             item.cell.innerHTML = buffer;
             applyColor(item.cell, buffer);
@@ -1305,6 +1409,125 @@ document.addEventListener("keydown", async function(e) {
         buffer = "";
         clearSelection();
         return; // ✅ IMPORTANT (STOP HERE)
+    }
+
+    // 🔥 UNDO
+    if (e.ctrlKey && e.key === "z") {
+
+        const action = undoStack.pop();
+        if (!action) return;
+
+        const res = await fetch(
+            `/roster-entry?employee_id=${action.empId}&date=${action.date}&shift_code=${action.old === "-" ? "" : action.old}`,
+            {
+                method: "PUT",
+                headers: {
+                    "Authorization": "Bearer " + localStorage.getItem("token")
+                }
+            }
+        );
+
+        if (!res.ok) {
+            console.error("Undo failed", await res.text());
+            return;
+        }
+
+        const cell = document.querySelector(
+            `[data-emp="${action.empId}"][data-date="${action.date}"]`
+        );
+
+        if (cell) {
+            const current = cell.innerText.trim() || "-";
+
+            cell.innerText = action.old;
+            applyColor(cell, action.old);
+
+            updateRowSummary(action.empId, current, action.old);
+            updatePivot(action.date, current, action.old);
+        }
+
+        redoStack.push(action);
+
+        return;
+    }
+
+    // 🔥 REDO
+    if (e.ctrlKey && e.shiftKey && e.key === "Z") {
+
+        const action = redoStack.pop();
+        if (!action) return;
+
+        const res = await fetch(
+            `/roster-entry?employee_id=${action.empId}&date=${action.date}&shift_code=${action.new === "-" ? "" : action.new}`,
+            {
+                method: "PUT",
+                headers: {
+                    "Authorization": "Bearer " + localStorage.getItem("token")
+                }
+            }
+        );
+
+        if (!res.ok) {
+            console.error("Redo failed", await res.text());
+            return;
+        }
+
+        const cell = document.querySelector(
+            `[data-emp="${action.empId}"][data-date="${action.date}"]`
+        );
+
+        if (cell) {
+            const current = cell.innerText.trim() || "-";
+
+            cell.innerText = action.new;
+            applyColor(cell, action.new);
+
+            updateRowSummary(action.empId, current, action.new);
+            updatePivot(action.date, current, action.new);
+        }
+
+        undoStack.push(action);
+
+        return;
+    }
+
+    // 🔥 SHIFT + ARROW = MULTI SELECT (EXCEL STYLE)
+    if (e.shiftKey && ["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)) {
+
+        e.preventDefault();
+
+        if (!activeCell) return;
+
+        // first time selection start
+        if (!startCell) {
+            startCell = activeCell;
+        }
+
+        const row = activeCell.parentElement;
+        const table = row.parentElement;
+
+        let r = row.rowIndex;
+        let c = activeCell.cellIndex;
+
+        if (e.key === "ArrowRight") c++;
+        if (e.key === "ArrowLeft") c--;
+        if (e.key === "ArrowDown") r++;
+        if (e.key === "ArrowUp") r--;
+
+        const nextRow = table.rows[r];
+        if (!nextRow) return;
+
+        const nextCell = nextRow.cells[c];
+        if (!nextCell || !nextCell.dataset.emp) return;
+
+        activeCell = nextCell;
+
+        // 🔥 IMPORTANT: extend selection
+        updateSelection(nextCell);
+
+        nextCell.scrollIntoView({ block: "nearest", inline: "nearest" });
+
+        return;
     }
 
     // =========================
@@ -1356,5 +1579,6 @@ document.addEventListener("click", (e) => {
     const cell = e.target.closest("td");
     if (cell && cell.dataset.emp) {
         activeCell = cell;
+        startCell = cell;
     }
 });

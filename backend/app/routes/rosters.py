@@ -68,7 +68,7 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         ).first()
 
         if admin and admin.password and pwd_context.verify(data.password, admin.password):
-            token = create_access_token({"sub": data.username})
+            token = create_access_token({"sub": data.username, "role": "admin"})
             return {"access_token": token, "token_type": "bearer"}
 
     except ProgrammingError:
@@ -76,7 +76,7 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
 
     # 👉 2. Fallback (ALWAYS WORKS)
     if data.username == "admin" and data.password == "admin123":
-        token = create_access_token({"sub": data.username})
+        token = create_access_token({"sub": data.username, "role": "admin"})
         return {"access_token": token, "token_type": "bearer"}
 
     raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -93,7 +93,16 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
         raise HTTPException(status_code=401, detail="Invalid token")
 
 @router.post("/rosters")
-def create_roster(month: int, year: int, db: Session = Depends(get_db), user=Depends(verify_token)):
+def create_roster(
+    month: int,
+    year: int,
+    db: Session = Depends(get_db),
+    user=Depends(verify_token)
+):
+
+    # 🔒 ADMIN CHECK (ADD HERE - FIRST LINE)
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
 
     # ❌ prevent duplicate roster
     existing = db.query(Roster).filter(
@@ -113,7 +122,6 @@ def create_roster(month: int, year: int, db: Session = Depends(get_db), user=Dep
     employees = db.query(Employee).filter(Employee.status == "active").all()
 
     days_in_month = calendar.monthrange(year, month)[1]
-
     start_date = date(year, month, 1)
 
     entries = []
@@ -190,40 +198,61 @@ def get_roster(month: int, year: int, db: Session = Depends(get_db)):
 def update_roster_entry(
     employee_id: int,
     date: str,
-    shift_code: str,
+    shift_code: str = "",
     db: Session = Depends(get_db),
     user=Depends(verify_token)
 ):
     from app.models.shift import Shift
 
-    # Convert date string to date object
+    # 👉 convert date
     roster_date = datetime.strptime(date, "%Y-%m-%d").date()
 
-    # Get shift
-    shift = db.query(Shift).filter_by(shift_code=shift_code).first()
-
-    if not shift:
-        return {"error": "Invalid shift code"}
-
-    # Find roster entry
+    # 👉 find entry
     entry = db.query(RosterEntry).filter_by(
         employee_id=employee_id,
         date=roster_date
     ).first()
 
     if not entry:
-        return {"error": "Roster entry not found"}
+        raise HTTPException(status_code=404, detail="Roster entry not found")
 
-    # 👉 GET OLD SHIFT
+    # 👉 OLD SHIFT
     old_shift = None
     if entry.shift_id:
         old = db.query(Shift).filter_by(id=entry.shift_id).first()
         old_shift = old.shift_code if old else None
 
-    # 👉 UPDATE SHIFT
+    # ====================================================
+    # 🔥 CASE 1: DELETE / CLEAR SHIFT
+    # ====================================================
+    if not shift_code or shift_code.strip() == "":
+        entry.shift_id = None
+
+        db.execute(text("""
+            INSERT INTO audit_logs (employee_id, date, old_shift, new_shift, changed_by)
+            VALUES (:emp, :date, :old, :new, :user)
+        """), {
+            "emp": employee_id,
+            "date": roster_date,
+            "old": old_shift,
+            "new": None,
+            "user": user.get("sub")
+        })
+
+        db.commit()
+
+        return {"message": "Shift cleared"}
+
+    # ====================================================
+    # 🔥 CASE 2: NORMAL UPDATE
+    # ====================================================
+    shift = db.query(Shift).filter_by(shift_code=shift_code).first()
+
+    if not shift:
+        raise HTTPException(status_code=400, detail="Invalid shift code")
+
     entry.shift_id = shift.id
 
-    # 👉 INSERT AUDIT LOG
     db.execute(text("""
         INSERT INTO audit_logs (employee_id, date, old_shift, new_shift, changed_by)
         VALUES (:emp, :date, :old, :new, :user)
