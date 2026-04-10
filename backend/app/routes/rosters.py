@@ -1,7 +1,7 @@
 from urllib import response
 from app.models import roster
 from app.models.admin_user import AdminUser
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from datetime import date, timedelta
 import calendar
@@ -16,7 +16,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
 from io import BytesIO
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from passlib.context import CryptContext
 from sqlalchemy.exc import ProgrammingError
@@ -396,13 +396,22 @@ def add_employee(
 ):
     name = data.get("name")
     team = data.get("team")
+    employee_code = data.get("employee_code")
+    email = data.get("email")
 
-    if not name or not team:
-        raise HTTPException(status_code=400, detail="Name and team required")
+    if not name or not team or not employee_code or not email:
+        raise HTTPException(status_code=400, detail="Name, team, employee code, and email required")
+    
+    existing = db.query(Employee).filter(Employee.employee_code == employee_code).first()
+
+    if existing:
+        raise HTTPException(status_code=400, detail="Employee code already exists")
 
     emp = Employee(
         name=name,
         team=team,
+        employee_code=employee_code,
+        email=email,
         status="active"
     )
 
@@ -440,6 +449,32 @@ def add_employee(
 
     return {"message": "Employee added", "id": emp.id}
 
+@router.put("/employees/{emp_id}")
+def update_employee(
+    emp_id: int,
+    data: dict,
+    db: Session = Depends(get_db),
+    user=Depends(verify_token)
+):
+
+    # 🔒 ADMIN ONLY
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    emp = db.query(Employee).filter(Employee.id == emp_id).first()
+
+    if not emp:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    emp.name = data.get("name", emp.name)
+    emp.team = data.get("team", emp.team)
+    emp.employee_code = data.get("employee_code", emp.employee_code)
+    emp.email = data.get("email", emp.email)
+
+    db.commit()
+
+    return {"message": "Employee updated"}
+
 @router.delete("/employees/{emp_id}")
 def delete_employee(
     emp_id: int,
@@ -465,7 +500,9 @@ def get_employees(db: Session = Depends(get_db)):
         {
             "id": emp.id,
             "name": emp.name,
-            "team": emp.team
+            "team": emp.team,
+            "employee_code": emp.employee_code,
+            "email": emp.email
         }
         for emp in employees
     ]
@@ -817,3 +854,99 @@ def get_audit_logs(month: int, year: int, db: Session = Depends(get_db)):
         })
 
     return result
+
+@router.post("/roster/import")
+def import_roster(
+    month: int,
+    year: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user=Depends(verify_token)
+):
+
+    # 🔒 ADMIN ONLY
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    roster = db.query(Roster).filter(
+        Roster.month == month,
+        Roster.year == year
+    ).order_by(Roster.id.desc()).first()
+
+    if not roster:
+        raise HTTPException(status_code=400, detail="Roster not found. Create first.")
+
+    wb = load_workbook(file.file)
+    ws = wb.active
+
+    errors = []
+    updated = 0
+
+    # 👉 Read header (dates)
+    headers = [cell.value for cell in ws[1]]
+
+    dates = []
+    for h in headers[1:]:
+        try:
+            # expects format like "Mon\n1"
+            day = int(str(h).split("\n")[-1])
+            dates.append(day)
+        except:
+            break
+
+    employees = db.query(Employee).filter(Employee.status == "active").all()
+    emp_map = {e.name: e.id for e in employees}
+
+    valid_shifts = {"S1","S2","S3","G","WO","CO","GH","LV"}
+
+    for row in ws.iter_rows(min_row=2, values_only=True):
+
+        name = row[0]
+
+        if not name or name not in emp_map:
+            errors.append(f"Invalid employee: {name}")
+            continue
+
+        emp_id = emp_map[name]
+
+        for i, day in enumerate(dates):
+
+            shift = row[i+1]
+
+            if not shift or shift == "-":
+                continue
+
+            shift = str(shift).strip()
+
+            if shift not in valid_shifts:
+                errors.append(f"{name} Day {day}: Invalid shift {shift}")
+                continue
+
+            entry_date = date(year, month, day)
+
+            entry = db.query(RosterEntry).filter_by(
+                employee_id=emp_id,
+                date=entry_date
+            ).first()
+
+            if not entry:
+                continue
+
+            shift_obj = db.query(Shift).filter_by(shift_code=shift).first()
+
+            if not shift_obj:
+                errors.append(f"{name} Day {day}: Shift not found in DB")
+                continue
+
+            entry.shift_id = shift_obj.id
+            updated += 1
+
+    if errors:
+        raise HTTPException(status_code=400, detail="\n".join(errors[:10]))
+
+    db.commit()
+
+    return {
+        "message": "Import successful",
+        "updated": updated
+    }

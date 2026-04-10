@@ -8,3 +8,5 @@ class Employee(Base):
     name = Column(String)
     team = Column(String)
     status = Column(String)
+    employee_code = Column(String, unique=True, nullable=True)
+    email = Column(String, nullable=True)

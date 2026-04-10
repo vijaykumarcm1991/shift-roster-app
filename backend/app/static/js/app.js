@@ -977,7 +977,15 @@ async function loadEmployees() {
             <tr class="border-b">
                 <td class="p-2">${emp.name}</td>
                 <td class="p-2">${emp.team}</td>
-                <td class="p-2">
+                <td class="p-2">${emp.employee_code || "-"}</td>
+                <td class="p-2">${emp.email || "-"}</td>
+                <td class="p-2 flex gap-2">
+                    <button 
+                        class="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600"
+                        onclick="editEmployee(${emp.id}, '${emp.name}', '${emp.team}', '${emp.employee_code}', '${emp.email}')">
+                        Edit
+                    </button>
+
                     <button 
                         class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
                         onclick="deleteEmployeeById(${emp.id})">
@@ -1023,9 +1031,11 @@ async function addEmployee() {
 
     const name = document.getElementById("empName").value;
     const team = document.getElementById("empTeam").value;
+    const employee_code = document.getElementById("empCode").value;
+    const email = document.getElementById("empEmail").value;
 
-    if (!name || !team) {
-        alert("Enter name and team");
+    if (!name || !team || !employee_code || !email) {
+        alert("Enter all fields");
         return;
     }
 
@@ -1035,10 +1045,8 @@ async function addEmployee() {
             "Content-Type": "application/json",
             "Authorization": "Bearer " + localStorage.getItem("token")
         },
-        body: JSON.stringify({ name, team })
+        body: JSON.stringify({ name, team, employee_code, email })
     });
-
-    const data = await res.json();
 
     if (res.status !== 200) {
         alert("Failed to add employee");
@@ -1049,6 +1057,53 @@ async function addEmployee() {
 
     document.getElementById("empName").value = "";
     document.getElementById("empTeam").value = "";
+    document.getElementById("empCode").value = "";
+    document.getElementById("empEmail").value = "";
+
+    loadEmployees();
+}
+
+async function editEmployee(id, name, team, code, email) {
+
+    if (!localStorage.getItem("token")) {
+        alert("Admin login required");
+        return;
+    }
+
+    const newName = prompt("Edit Name:", name);
+    if (!newName) return;
+
+    const newTeam = prompt("Edit Team:", team);
+    if (!newTeam) return;
+
+    const newCode = prompt("Edit Employee Code:", code);
+    if (!newCode) return;
+
+    const newEmail = prompt("Edit Email:", email);
+    if (!newEmail) return;
+
+    const res = await fetch(`/employees/${id}`, {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + localStorage.getItem("token")
+        },
+        body: JSON.stringify({
+            name: newName,
+            team: newTeam,
+            employee_code: newCode,
+            email: newEmail
+        })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+        alert(data.detail || "Update failed");
+        return;
+    }
+
+    alert("Employee updated successfully");
 
     loadEmployees();
 }
@@ -1135,6 +1190,55 @@ async function deleteAdminById(id) {
     alert("Admin deleted");
 
     loadAdmins();
+}
+
+async function importRoster() {
+
+    if (!localStorage.getItem("token")) {
+        alert("Admin login required");
+        return;
+    }
+
+    const fileInput = document.getElementById("importFile");
+    const file = fileInput.files[0];
+
+    if (!file) {
+        alert("Please select a file");
+        return;
+    }
+
+    const month = document.getElementById("monthSelect").value;
+    const year = document.getElementById("yearSelect").value;
+
+    if (!month || !year) {
+        alert("Select month & year");
+        return;
+    }
+
+    if (!confirm("This will overwrite roster data for selected month. Continue?")) {
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch(`/roster/import?month=${month}&year=${year}`, {
+        method: "POST",
+        headers: {
+            "Authorization": "Bearer " + localStorage.getItem("token")
+        },
+        body: formData
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+        alert(data.detail || "Import failed");
+        return;
+    }
+
+    alert(`Import successful\nUpdated: ${data.updated}`);
+
 }
 
 function initSidebar(page) {

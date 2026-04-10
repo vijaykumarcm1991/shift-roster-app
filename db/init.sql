@@ -3,6 +3,8 @@ CREATE TABLE IF NOT EXISTS employees (
     name VARCHAR(100),
     team VARCHAR(100),
     status VARCHAR(20) DEFAULT 'active',
+    employee_code VARCHAR(50) UNIQUE,
+    email VARCHAR(100) UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
