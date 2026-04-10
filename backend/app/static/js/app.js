@@ -1298,6 +1298,42 @@ async function loadAllowanceReport() {
     document.getElementById("allowanceBody").innerHTML = html;
 }
 
+async function exportAllowance() {
+
+    const month = document.getElementById("monthSelect").value;
+    const year = document.getElementById("yearSelect").value;
+
+    if (!month || !year) {
+        alert("Select month & year");
+        return;
+    }
+
+    const res = await fetch(`/shift-allowance/export?month=${month}&year=${year}`, {
+        method: "GET",
+        headers: {
+            "Authorization": "Bearer " + localStorage.getItem("token")
+        }
+    });
+
+    if (!res.ok) {
+        alert("Export failed");
+        return;
+    }
+
+    const blob = await res.blob();
+
+    const url = window.URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `shift_allowance_${month}_${year}.xlsx`;
+
+    document.body.appendChild(a);
+    a.click();
+
+    a.remove();
+}
+
 function initSidebar(page) {
 
     const token = localStorage.getItem("token");

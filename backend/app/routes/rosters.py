@@ -1030,3 +1030,144 @@ def shift_allowance(month: int, year: int, db: Session = Depends(get_db)):
         "employees": final,
         "totals": totals
     }
+
+@router.get("/shift-allowance/export")
+def export_shift_allowance(
+    month: int,
+    year: int,
+    db: Session = Depends(get_db),
+    user=Depends(verify_token)
+):
+
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+
+    roster = db.query(Roster).filter(
+        Roster.month == month,
+        Roster.year == year
+    ).order_by(Roster.id.desc()).first()
+
+    if not roster:
+        raise HTTPException(status_code=404, detail="Roster not found")
+
+    entries = db.query(RosterEntry).filter_by(roster_id=roster.id).all()
+
+    result = {}
+
+    rates = {"S1":400, "S2":400, "S3":500}
+
+    for entry in entries:
+
+        emp = db.query(Employee).filter_by(id=entry.employee_id).first()
+
+        if entry.employee_id not in result:
+            result[entry.employee_id] = {
+                "name": emp.name,
+                "code": emp.employee_code,
+                "email": emp.email,
+                "S1":0,"S2":0,"S3":0
+            }
+
+        if entry.shift_id:
+            shift = db.query(Shift).filter_by(id=entry.shift_id).first()
+            if shift.shift_code in ["S1","S2","S3"]:
+                result[entry.employee_id][shift.shift_code] += 1
+
+    # ================= EXCEL =================
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, Border, Side
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Shift Allowance"
+
+    bold = Font(bold=True)
+    center = Alignment(horizontal="center", vertical="center")
+    border = Border(left=Side(style='thin'), right=Side(style='thin'),
+                    top=Side(style='thin'), bottom=Side(style='thin'))
+
+    headers = [
+        "Name","Employee Code","Email",
+        "S1","S2","S3",
+        "S1 ₹","S2 ₹","S3 ₹",
+        "Grand Total"
+    ]
+
+    ws.append(headers)
+
+    for cell in ws[1]:
+        cell.font = bold
+        cell.alignment = center
+        cell.border = border
+
+    totals = {
+        "S1":0,"S2":0,"S3":0,
+        "S1_amt":0,"S2_amt":0,"S3_amt":0,
+        "grand":0
+    }
+
+    row_idx = 2
+
+    for emp in result.values():
+
+        s1 = emp["S1"]
+        s2 = emp["S2"]
+        s3 = emp["S3"]
+
+        s1_amt = s1 * rates["S1"]
+        s2_amt = s2 * rates["S2"]
+        s3_amt = s3 * rates["S3"]
+
+        grand = s1_amt + s2_amt + s3_amt
+
+        totals["S1"] += s1
+        totals["S2"] += s2
+        totals["S3"] += s3
+        totals["S1_amt"] += s1_amt
+        totals["S2_amt"] += s2_amt
+        totals["S3_amt"] += s3_amt
+        totals["grand"] += grand
+
+        ws.append([
+            emp["name"], emp["code"], emp["email"],
+            s1, s2, s3,
+            s1_amt, s2_amt, s3_amt,
+            grand
+        ])
+
+        for col in ws[row_idx]:
+            col.alignment = center
+            col.border = border
+
+        row_idx += 1
+
+    # 🔥 GRAND TOTAL ROW
+    ws.append([
+        "Grand Total", "", "",
+        totals["S1"], totals["S2"], totals["S3"],
+        totals["S1_amt"], totals["S2_amt"], totals["S3_amt"],
+        totals["grand"]
+    ])
+
+    for cell in ws[row_idx]:
+        cell.font = bold
+        cell.alignment = center
+        cell.border = border
+
+    # AUTO WIDTH
+    for col in ws.columns:
+        max_len = max(len(str(c.value)) if c.value else 0 for c in col)
+        ws.column_dimensions[col[0].column_letter].width = max_len + 2
+
+    from io import BytesIO
+    stream = BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+
+    return StreamingResponse(
+        stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename=shift_allowance_{month}_{year}.xlsx"
+        }
+    )
