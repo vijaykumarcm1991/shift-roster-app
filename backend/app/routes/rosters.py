@@ -1,4 +1,5 @@
 from urllib import response
+from wsgiref import headers
 from app.models import roster
 from app.models.admin_user import AdminUser
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
@@ -886,12 +887,31 @@ def import_roster(
     headers = [cell.value for cell in ws[1]]
 
     dates = []
+
     for h in headers[1:]:
         try:
-            # expects format like "Mon\n1"
-            day = int(str(h).split("\n")[-1])
-            dates.append(day)
-        except:
+            val = str(h).strip()
+
+            # ✅ SUPPORT: 01-03-2026
+            try:
+                dt = datetime.strptime(val, "%d-%m-%Y").date()
+            except:
+                # ✅ SUPPORT: Excel native date format
+                if isinstance(h, datetime):
+                    dt = h.date()
+                else:
+                    break
+
+            # 🔒 VALIDATE MONTH/YEAR
+            if dt.month != int(month) or dt.year != int(year):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Date {val} does not match selected month/year"
+                )
+
+            dates.append(dt)
+
+        except Exception:
             break
 
     employees = db.query(Employee).filter(Employee.status == "active").all()
@@ -909,7 +929,7 @@ def import_roster(
 
         emp_id = emp_map[name]
 
-        for i, day in enumerate(dates):
+        for i, entry_date in enumerate(dates):
 
             shift = row[i+1]
 
@@ -919,10 +939,8 @@ def import_roster(
             shift = str(shift).strip()
 
             if shift not in valid_shifts:
-                errors.append(f"{name} Day {day}: Invalid shift {shift}")
+                errors.append(f"{name} {entry_date}: Invalid shift {shift}")
                 continue
-
-            entry_date = date(year, month, day)
 
             entry = db.query(RosterEntry).filter_by(
                 employee_id=emp_id,
