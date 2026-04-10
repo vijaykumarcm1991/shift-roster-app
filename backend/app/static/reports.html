@@ -95,6 +95,40 @@
 
         </div>
 
+        <div class="bg-white p-4 rounded shadow mb-6">
+            
+            <button onclick="loadAllowanceReport()"
+                class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">
+                Calculate Shift Allowance
+            </button>
+
+        </div>
+
+        <div class="bg-white p-4 rounded shadow">
+            <h3 class="text-lg font-bold mb-2">Shift Allowance</h3>
+
+            <div class="overflow-auto">
+                <table class="w-full border text-sm">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="p-2 border">Name</th>
+                            <th class="p-2 border">Emp Code</th>
+                            <th class="p-2 border">Email</th>
+                            <th class="p-2 border">S1</th>
+                            <th class="p-2 border">S2</th>
+                            <th class="p-2 border">S3</th>
+                            <th class="p-2 border">S1 ₹</th>
+                            <th class="p-2 border">S2 ₹</th>
+                            <th class="p-2 border">S3 ₹</th>
+                            <th class="p-2 border">Grand Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="allowanceBody"></tbody>
+                </table>
+            </div>
+
+        </div>
+
         <div class="bg-white p-4 rounded shadow mt-4">
             <h3 class="text-lg font-bold mb-2">Audit Logs</h3>
 

@@ -950,3 +950,83 @@ def import_roster(
         "message": "Import successful",
         "updated": updated
     }
+
+@router.get("/shift-allowance")
+def shift_allowance(month: int, year: int, db: Session = Depends(get_db)):
+
+    roster = db.query(Roster).filter(
+        Roster.month == month,
+        Roster.year == year
+    ).order_by(Roster.id.desc()).first()
+
+    if not roster:
+        raise HTTPException(status_code=404, detail="Roster not found")
+
+    entries = db.query(RosterEntry).filter_by(roster_id=roster.id).all()
+
+    result = {}
+
+    rates = {"S1":400, "S2":400, "S3":500}
+
+    for entry in entries:
+
+        emp = db.query(Employee).filter_by(id=entry.employee_id).first()
+
+        if entry.employee_id not in result:
+            result[entry.employee_id] = {
+                "name": emp.name,
+                "code": emp.employee_code,
+                "email": emp.email,
+                "S1":0,
+                "S2":0,
+                "S3":0
+            }
+
+        if entry.shift_id:
+            shift = db.query(Shift).filter_by(id=entry.shift_id).first()
+            if shift.shift_code in ["S1","S2","S3"]:
+                result[entry.employee_id][shift.shift_code] += 1
+
+    # 🔥 CALCULATE ALLOWANCE
+    final = []
+
+    totals = {
+        "S1":0,"S2":0,"S3":0,
+        "S1_amt":0,"S2_amt":0,"S3_amt":0,
+        "grand":0
+    }
+
+    for emp in result.values():
+
+        s1_amt = emp["S1"] * rates["S1"]
+        s2_amt = emp["S2"] * rates["S2"]
+        s3_amt = emp["S3"] * rates["S3"]
+
+        grand = s1_amt + s2_amt + s3_amt
+
+        totals["S1"] += emp["S1"]
+        totals["S2"] += emp["S2"]
+        totals["S3"] += emp["S3"]
+
+        totals["S1_amt"] += s1_amt
+        totals["S2_amt"] += s2_amt
+        totals["S3_amt"] += s3_amt
+        totals["grand"] += grand
+
+        final.append({
+            "name": emp["name"],
+            "code": emp["code"],
+            "email": emp["email"],
+            "S1": emp["S1"],
+            "S2": emp["S2"],
+            "S3": emp["S3"],
+            "S1_amt": s1_amt,
+            "S2_amt": s2_amt,
+            "S3_amt": s3_amt,
+            "grand": grand
+        })
+
+    return {
+        "employees": final,
+        "totals": totals
+    }

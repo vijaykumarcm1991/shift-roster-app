@@ -1241,6 +1241,63 @@ async function importRoster() {
 
 }
 
+async function loadAllowanceReport() {
+
+    const month = document.getElementById("monthSelect").value;
+    const year = document.getElementById("yearSelect").value;
+
+    if (!month || !year) {
+        alert("Select month & year");
+        return;
+    }
+
+    const res = await fetch(`/shift-allowance?month=${month}&year=${year}`);
+    const data = await res.json();
+
+    if (!res.ok) {
+        alert(data.detail || "Failed");
+        return;
+    }
+
+    let html = "";
+
+    data.employees.forEach(emp => {
+
+        html += `
+        <tr>
+            <td class="p-2 border">${emp.name}</td>
+            <td class="p-2 border">${emp.code || "-"}</td>
+            <td class="p-2 border">${emp.email || "-"}</td>
+            <td class="p-2 border text-center">${emp.S1}</td>
+            <td class="p-2 border text-center">${emp.S2}</td>
+            <td class="p-2 border text-center">${emp.S3}</td>
+            <td class="p-2 border text-center">₹${emp.S1_amt}</td>
+            <td class="p-2 border text-center">₹${emp.S2_amt}</td>
+            <td class="p-2 border text-center">₹${emp.S3_amt}</td>
+            <td class="p-2 border font-bold text-center">₹${emp.grand}</td>
+        </tr>
+        `;
+    });
+
+    // 🔥 GRAND TOTAL ROW
+    const t = data.totals;
+
+    html += `
+    <tr class="bg-gray-200 font-bold">
+        <td colspan="3" class="p-2 border text-right">Grand Total</td>
+        <td class="p-2 border text-center">${t.S1}</td>
+        <td class="p-2 border text-center">${t.S2}</td>
+        <td class="p-2 border text-center">${t.S3}</td>
+        <td class="p-2 border text-center">₹${t.S1_amt}</td>
+        <td class="p-2 border text-center">₹${t.S2_amt}</td>
+        <td class="p-2 border text-center">₹${t.S3_amt}</td>
+        <td class="p-2 border text-center">₹${t.grand}</td>
+    </tr>
+    `;
+
+    document.getElementById("allowanceBody").innerHTML = html;
+}
+
 function initSidebar(page) {
 
     const token = localStorage.getItem("token");
