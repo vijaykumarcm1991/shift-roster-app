@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body class="bg-gray-100">
+
+<div>
+
+<!-- SIDEBAR -->
+<div class="sidebar w-60 bg-white shadow-md h-screen p-4 fixed transition-all duration-300 overflow-hidden">
+
+    <div class="flex flex-col items-center mb-6">
+        <img src="/static/onmobile.png" class="h-10 w-auto object-contain mb-2">
+        <h2 class="text-xl font-bold text-indigo-600">📊 NOC Panel</h2>
+    </div>
+
+    <div class="space-y-2">
+        <button id="navRoster" onclick="location.href='roster.html'" class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-200"><span>📅</span><span>Roster</span></button>
+
+        <button id="navReports" onclick="location.href='reports.html'" class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-200"><span>📊</span><span>Reports</span></button>
+
+        <button id="navEmployees" onclick="location.href='employees.html'" class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-200"><span>👥</span><span>Employees</span></button>
+
+        <button id="navAdmin" onclick="location.href='admin.html'" class="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-200"><span>🛠</span><span>Admin</span></button>
+
+        <button id="navDashboard" onclick="location.href='dashboard.html'" class="flex items-center gap-2 px-3 py-2 rounded bg-gray-200"><span>📈</span><span>Dashboard</span></button>
+    </div>
+
+    <hr class="my-4">
+
+    <!-- 🔥 USER -->
+    <div id="userLabel" class="text-sm text-gray-600 mb-2 hidden"></div>
+
+    <button id="loginBtn" onclick="location.href='login.html'"
+        class="w-full text-left px-3 py-2 rounded hover:bg-gray-200">
+        🔐 Login
+    </button>
+
+    <button id="logoutBtn" onclick="logout()"
+        class="w-full text-left px-3 py-2 rounded hover:bg-gray-200 hidden">
+        🚪 Logout
+    </button>
+
+</div>
+
+<div class="main ml-64 p-6">
+
+<h2 class="text-2xl font-bold mb-6">📈 Dashboard</h2>
+
+<div class="flex gap-3 mb-6">
+    <select id="monthSelect" class="border p-2 rounded"></select>
+    <select id="yearSelect" class="border p-2 rounded">
+        <script>
+            const year = new Date().getFullYear();
+            for (let i = year - 2; i <= year + 2; i++) {
+                document.write(`<option value="${i}">${i}</option>`);
+            }
+        </script>
+    </select>
+
+    <button onclick="loadDashboard()"
+        class="bg-indigo-600 text-white px-4 py-2 rounded">
+        Load
+    </button>
+</div>
+
+<div class="grid grid-cols-2 gap-6">
+
+    <div class="bg-white p-4 rounded shadow h-[300px]">
+        <h3 class="font-semibold mb-2">Top Performers</h3>
+        <canvas id="topChart"></canvas>
+    </div>
+
+    <div class="bg-white p-4 rounded shadow h-[300px]">
+        <h3 class="font-semibold mb-2">Shift Distribution</h3>
+        <canvas id="shiftChart" style="height:250px;"></canvas>
+    </div>
+
+    <div class="bg-white p-4 rounded shadow h-[300px]">
+        <h3 class="font-semibold mb-2">Leave Trends</h3>
+        <canvas id="leaveChart" style="height:250px;"></canvas>
+    </div>
+
+    <div class="bg-white p-4 rounded shadow col-span-2 h-[350px]">
+        <h3 class="font-semibold mb-2">Daily Staffing</h3>
+        <canvas id="dailyChart" style="height:300px;"></canvas>
+    </div>
+
+</div>
+
+</div>
+</div>
+
+<script src="/static/js/app.js"></script>
+<script>
+initSidebar("dashboard");
+initMonthDropdown();
+</script>
+
+</body>
+</html>

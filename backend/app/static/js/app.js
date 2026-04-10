@@ -8,6 +8,13 @@ let copiedCells = [];
 let undoStack = [];
 let redoStack = [];
 
+let topChartInstance;
+let shiftChartInstance;
+let leaveChartInstance;
+let dailyChartInstance;
+Chart.defaults.font.family = "Inter, system-ui, sans-serif";
+Chart.defaults.color = "#6b7280";
+
 function initMonthDropdown() {
     const monthSelect = document.getElementById("monthSelect");
     if (!monthSelect) return;
@@ -1334,6 +1341,162 @@ async function exportAllowance() {
     a.remove();
 }
 
+async function loadDashboard() {
+
+    const month = document.getElementById("monthSelect").value;
+    const year = document.getElementById("yearSelect").value;
+
+    const res = await fetch(`/dashboard?month=${month}&year=${year}`);
+    const data = await res.json();
+
+    // 🔥 DESTROY OLD CHARTS (PRO FIX)
+    if (topChartInstance) topChartInstance.destroy();
+    if (shiftChartInstance) shiftChartInstance.destroy();
+    if (leaveChartInstance) leaveChartInstance.destroy();
+    if (dailyChartInstance) dailyChartInstance.destroy();
+
+    // 🔹 TOP
+    topChartInstance = new Chart(document.getElementById("topChart"), {
+        type: "bar",
+        data: {
+            labels: data.top.map(e => e.name),
+            datasets: [{
+                label: "Shifts",
+                data: data.top.map(e => e.total),
+                borderRadius: 10,
+                barThickness: 30,
+                backgroundColor: function(context) {
+                    const chart = context.chart;
+                    const {ctx, chartArea} = chart;
+
+                    if (!chartArea) return;
+
+                    const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                    gradient.addColorStop(0, "#6366f1");
+                    gradient.addColorStop(1, "#8b5cf6");
+
+                    return gradient;
+                }
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                x: {
+                    grid: { display: false }
+                },
+                y: {
+                    grid: { color: "#f3f4f6" },
+                    ticks: { stepSize: 1 }
+                }
+            }
+        }
+    });
+
+    // 🔹 SHIFT
+    shiftChartInstance = new Chart(document.getElementById("shiftChart"), {
+        type: "doughnut",
+        data: {
+            labels: ["S1", "S2", "S3"],
+            datasets: [{
+                data: [
+                    data.shift_distribution.S1,
+                    data.shift_distribution.S2,
+                    data.shift_distribution.S3
+                ],
+                backgroundColor: ["#3b82f6", "#f59e0b", "#8b5cf6"],
+                borderWidth: 0,
+                hoverOffset: 8
+            }]
+        },
+        options: {
+            cutout: "65%",
+            plugins: {
+                legend: {
+                    position: "bottom"
+                }
+            },
+            maintainAspectRatio: false
+        }
+    });
+
+    // 🔹 LEAVE
+    leaveChartInstance = new Chart(document.getElementById("leaveChart"), {
+        type: "doughnut",
+        data: {
+            labels: ["WO", "LV", "CO", "GH"],
+            datasets: [{
+                data: [
+                    data.leave_distribution.WO,
+                    data.leave_distribution.LV,
+                    data.leave_distribution.CO,
+                    data.leave_distribution.GH
+                ],
+                backgroundColor: ["#9ca3af", "#ef4444", "#06b6d4", "#fde68a"],
+                borderWidth: 0,
+                hoverOffset: 8
+            }]
+        },
+        options: {
+            cutout: "65%",
+            plugins: {
+                legend: {
+                    position: "bottom"
+                }
+            },
+            maintainAspectRatio: false
+        }
+    });
+
+    // 🔹 DAILY
+    dailyChartInstance = new Chart(document.getElementById("dailyChart"), {
+        type: "line",
+        data: {
+            labels: Object.keys(data.daily),
+            datasets: [{
+                label: "Daily Shifts",
+                data: Object.values(data.daily),
+                tension: 0.4,
+                fill: true,
+                borderWidth: 2,
+                pointRadius: 3,
+                backgroundColor: function(context) {
+                    const chart = context.chart;
+                    const {ctx, chartArea} = chart;
+
+                    if (!chartArea) return;
+
+                    const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                    gradient.addColorStop(0, "rgba(99,102,241,0.4)");
+                    gradient.addColorStop(1, "rgba(99,102,241,0)");
+
+                    return gradient;
+                },
+                borderColor: "#6366f1"
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                x: {
+                    grid: { display: false }
+                },
+                y: {
+                    grid: { color: "#f3f4f6" }
+                }
+            }
+        }
+    });
+}
+
 function initSidebar(page) {
 
     const token = localStorage.getItem("token");
@@ -1343,11 +1506,13 @@ function initSidebar(page) {
     const reportsBtn = document.getElementById("navReports");
     const empBtn = document.getElementById("navEmployees");
     const adminBtn = document.getElementById("navAdmin");
+    const dashboardBtn = document.getElementById("navDashboard");
 
     if (page === "roster" && rosterBtn) rosterBtn.style.display = "none";
     if (page === "reports" && reportsBtn) reportsBtn.style.display = "none";
     if (page === "employees" && empBtn) empBtn.style.display = "none";
     if (page === "admin" && adminBtn) adminBtn.style.display = "none";
+    if (page === "dashboard" && dashboardBtn) dashboardBtn.style.display = "none";
 
     // 🔹 Login / Logout
     const loginBtn = document.getElementById("loginBtn");

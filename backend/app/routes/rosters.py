@@ -1189,3 +1189,71 @@ def export_shift_allowance(
             "Content-Disposition": f"attachment; filename=shift_allowance_{month}_{year}.xlsx"
         }
     )
+
+@router.get("/dashboard")
+def dashboard(month: int, year: int, db: Session = Depends(get_db)):
+
+    roster = db.query(Roster).filter(
+        Roster.month == month,
+        Roster.year == year
+    ).order_by(Roster.id.desc()).first()
+
+    if not roster:
+        return {}
+
+    entries = db.query(RosterEntry).filter_by(roster_id=roster.id).all()
+
+    from collections import defaultdict
+    result = defaultdict(lambda: {
+        "name": "",
+        "S1": 0, "S2": 0, "S3": 0,
+        "WO": 0, "LV": 0, "CO": 0, "GH": 0
+    })
+
+    daily = defaultdict(int)
+
+    for e in entries:
+
+        emp = db.query(Employee).filter_by(id=e.employee_id).first()
+
+        if not emp:
+            continue
+
+        result[e.employee_id]["name"] = emp.name
+
+        if e.shift_id:
+            shift = db.query(Shift).filter_by(id=e.shift_id).first()
+            code = shift.shift_code
+
+            # 🔹 TOP + DAILY (ONLY S1 S2 S3)
+            if code in ["S1", "S2", "S3"]:
+                result[e.employee_id][code] += 1
+                daily[str(e.date)] += 1
+
+            # 🔹 LEAVE
+            if code in ["WO", "LV", "CO", "GH"]:
+                result[e.employee_id][code] += 1
+
+    # 🔹 TOP EMPLOYEES
+    top = []
+    for emp in result.values():
+        total = emp["S1"] + emp["S2"] + emp["S3"]
+        top.append({"name": emp["name"], "total": total})
+
+    # 🔹 SHIFT DISTRIBUTION
+    shift_dist = {"S1":0,"S2":0,"S3":0}
+    leave_dist = {"WO":0,"LV":0,"CO":0,"GH":0}
+
+    for emp in result.values():
+        for s in ["S1","S2","S3"]:
+            shift_dist[s] += emp[s]
+
+        for l in leave_dist:
+            leave_dist[l] += emp[l]
+
+    return {
+        "top": sorted(top, key=lambda x: x["total"], reverse=True),
+        "shift_distribution": shift_dist,
+        "leave_distribution": leave_dist,
+        "daily": daily
+    }
